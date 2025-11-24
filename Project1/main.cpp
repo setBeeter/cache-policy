@@ -3,8 +3,8 @@
 #include <string>
 #include "arc.h"
 #include "lru.h"
-//#include"TDC.h"  // TDC算法已注释
-//#include"score.h"  // SCORE算法已注释
+#include"TDC.h"
+#include"score.h"
 #include "TraceLine.h"
 #include <vector>
 #include <chrono>
@@ -39,8 +39,8 @@ int main(int argc, char** argv) { // 第一个参数是
 
     LRUCache lru_cache(c, argv[2]);
     ARCCache arc_cache(c, argv[2]);
-    //SCORECache score_cache(c, argv[2]);  // SCORE算法已注释
-    //TDCCache tdc_cache(c, argv[2]);  // TDC算法已注释
+    SCORECache score_cache(c, argv[2]);
+    TDCCache tdc_cache(c, argv[2]);
     trace_line l;
     int access_counter = 0;
     // 在主循环中添加一个计数器
@@ -62,8 +62,8 @@ int main(int argc, char** argv) { // 第一个参数是
         l.current_time = time(nullptr);  // 使用系统当前时间
         l.access_count = 0;  // 初始化访问次数为0
         // 获取相应的数据
-        //int n = 1; // 初始化周期计数器（TDC算法已注释，不再需要）
-        //int requestCounter = 0; // 请求计数器（TDC算法已注释，不再需要）
+        int n = 1; // 初始化周期计数器
+        int requestCounter = 0; // 请求计数器
         //内部的 for 循环则对从文件中读取的每个 trace 数据进行缓存访问的模拟。在每次迭代中，它对当前 trace 数据中描述的块范围进行循环，调用 LRUCache 和 ARCCache 类的 get 方法来模拟从缓存中获取数据。
         //在这个循环内，针对每个块，它执行了一些断言检查，确保缓存访问的正确性。
         for (auto i = l.starting_block; i < (l.starting_block + l.size_of_blocks); ++i) {
@@ -74,35 +74,36 @@ int main(int argc, char** argv) { // 第一个参数是
             auto res2 = arc_cache.get(i);
             assert(res2 != -1);
 
-            // SCORE算法相关代码已注释
+            // SCORE算法相关代码
             // 获取系统当前时间
-            //auto getCurrentTime = []() {
-            //    return static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(
-            //        std::chrono::system_clock::now().time_since_epoch()
-            //    ).count());
-            //};
-            //
-            //// 创建一个新的 trace_line 对象
-            //trace_line new_trace;
-            //new_trace.starting_block = l.starting_block;
-            //new_trace.size_of_blocks = l.size_of_blocks;
-            //new_trace.ignore = l.ignore;
-            //new_trace.request_number = l.request_number;
-            //new_trace.access_count = l.access_count;
-            //new_trace.current_time = getCurrentTime();
-            //// 将新的 trace_line 对象添加到 trace_records 容器中
-            ////trace_records.push_back(new_trace);
-            //SCOREParams scoreparam{ i, trace_records };
-            //auto res3 = score_cache.get(scoreparam);
-            //assert(res3 != -1);
-            // TDC算法相关代码已注释
+            auto getCurrentTime = []() {
+                return static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::system_clock::now().time_since_epoch()
+                ).count());
+            };
+            
+            // 创建一个新的 trace_line 对象
+            trace_line new_trace;
+            new_trace.starting_block = l.starting_block;
+            new_trace.size_of_blocks = l.size_of_blocks;
+            new_trace.ignore = l.ignore;
+            new_trace.request_number = l.request_number;
+            new_trace.access_count = l.access_count;
+            new_trace.current_time = getCurrentTime();
+            // 将新的 trace_line 对象添加到 trace_records 容器中
+            trace_records.push_back(new_trace);
+            SCOREParams scoreparam{ i, trace_records };
+            auto res3 = score_cache.get(scoreparam);
+            assert(res3 != -1);
+            // TDC算法相关代码
             // 判断是否达到一个周期
-            //if (requestCounter % 160000 == 0) {
-            //    ++n;
-            //}
-            //TDCParams tdcParams{ i, n, static_cast<double>(size) };//i对象 n是周期 size缓存大小
-            //auto res4 = tdc_cache.get(tdcParams);
-            //assert(res4 != -1);
+            if (requestCounter % 160000 == 0) {
+                ++n;
+            }
+            TDCParams tdcParams{ i, n, static_cast<double>(size) };//i对象 n是周期 size缓存大小
+            auto res4 = tdc_cache.get(tdcParams);
+            assert(res4 != -1);
+            requestCounter++;
         }
         
         // 每100行输出一次进度信息和耗时信息，便于对比时间提升情况
@@ -131,8 +132,8 @@ int main(int argc, char** argv) { // 第一个参数是
 
     std::cout << lru_cache.statics();
     std::cout << arc_cache.statics();
-    //std::cout << score_cache.statics();  // SCORE算法已注释
-    //std::cout << tdc_cache.statics();  // TDC算法已注释
+    std::cout << score_cache.statics();
+    std::cout << tdc_cache.statics();
     return 0;
 }
 

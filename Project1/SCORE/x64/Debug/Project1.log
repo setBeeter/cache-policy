@@ -1,0 +1,10 @@
+﻿  TDC.cpp
+D:\Desktop\project\Cache Policy\SCORE\Project1\TDC.cpp(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+D:\Desktop\project\Cache Policy\SCORE\Project1\TDC.cpp(26,64): warning C4244: “=”: 从“const double”转换到“int”，可能丢失数据
+D:\Desktop\project\Cache Policy\SCORE\Project1\TDC.cpp(99,64): warning C4244: “=”: 从“const double”转换到“int”，可能丢失数据
+D:\Desktop\project\Cache Policy\SCORE\Project1\TDC.cpp(119,25): warning C4244: “初始化”: 从“_Rep”转换到“double”，可能丢失数据
+D:\Desktop\project\Cache Policy\SCORE\Project1\TDC.cpp(119,25): warning C4244:         with
+D:\Desktop\project\Cache Policy\SCORE\Project1\TDC.cpp(119,25): warning C4244:         [
+D:\Desktop\project\Cache Policy\SCORE\Project1\TDC.cpp(119,25): warning C4244:             _Rep=__int64
+D:\Desktop\project\Cache Policy\SCORE\Project1\TDC.cpp(119,25): warning C4244:         ]
+  Project1.vcxproj -> D:\Desktop\project\Cache Policy\SCORE\Project1\x64\Debug\SCORE.exe

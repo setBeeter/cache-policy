@@ -13,6 +13,8 @@
 #include"tdc2.h"
 
 
+//whc测试
+
 
 // 定义一个用于存储 trace_line 记录的容器
 std::vector<trace_line> trace_records;

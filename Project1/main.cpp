@@ -117,14 +117,6 @@ int main(int argc, char** argv) { // 第一个参数是
             std::cout << "Processed " << line_count << " lines... "
                       << "Elapsed time: " << elapsed_minutes << "m " << elapsed_seconds << "s\n";
         }
-        
-        // 注释掉详细的每行输出，以提升性能
-        //std::cout << "Starting Block: " << l.starting_block << "\n"
-        //    << "Number of Blocks: " << l.size_of_blocks << "\n"
-        //    << "Ignore: " << l.ignore << "\n"
-        //    << "Request Number: " << l.request_number << "\n"
-        //    << "Current Access Time: " << l.current_time << "\n"
-        //    << "------------------------\n";
 
         trace_records.push_back(l);
     }

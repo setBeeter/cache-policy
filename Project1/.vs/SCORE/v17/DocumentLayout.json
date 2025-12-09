@@ -3,20 +3,20 @@
   "WorkspaceRootPath": "D:\\Desktop\\project\\Cache Policy\\SCORE\\Project1\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{6D53DFE0-3E32-440B-BF03-99BB310051C9}|Project1.vcxproj|D:\\Desktop\\project\\Cache Policy\\SCORE\\Project1\\main.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
-      "RelativeMoniker": "D:0:0:{6D53DFE0-3E32-440B-BF03-99BB310051C9}|Project1.vcxproj|solutionrelative:main.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{6D53DFE0-3E32-440B-BF03-99BB310051C9}|Project1.vcxproj|D:\\Desktop\\project\\Cache Policy\\SCORE\\Project1\\lru.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
-      "RelativeMoniker": "D:0:0:{6D53DFE0-3E32-440B-BF03-99BB310051C9}|Project1.vcxproj|solutionrelative:lru.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{6D53DFE0-3E32-440B-BF03-99BB310051C9}|Project1.vcxproj|D:\\Desktop\\project\\Cache Policy\\SCORE\\Project1\\score.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
       "RelativeMoniker": "D:0:0:{6D53DFE0-3E32-440B-BF03-99BB310051C9}|Project1.vcxproj|solutionrelative:score.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{6D53DFE0-3E32-440B-BF03-99BB310051C9}|Project1.vcxproj|D:\\Desktop\\project\\Cache Policy\\SCORE\\Project1\\score.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
       "RelativeMoniker": "D:0:0:{6D53DFE0-3E32-440B-BF03-99BB310051C9}|Project1.vcxproj|solutionrelative:score.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{6D53DFE0-3E32-440B-BF03-99BB310051C9}|Project1.vcxproj|D:\\Desktop\\project\\Cache Policy\\SCORE\\Project1\\main.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{6D53DFE0-3E32-440B-BF03-99BB310051C9}|Project1.vcxproj|solutionrelative:main.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{6D53DFE0-3E32-440B-BF03-99BB310051C9}|Project1.vcxproj|D:\\Desktop\\project\\Cache Policy\\SCORE\\Project1\\lru.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{6D53DFE0-3E32-440B-BF03-99BB310051C9}|Project1.vcxproj|solutionrelative:lru.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{6D53DFE0-3E32-440B-BF03-99BB310051C9}|Project1.vcxproj|D:\\Desktop\\project\\Cache Policy\\SCORE\\Project1\\TraceLine.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
@@ -54,21 +54,20 @@
       "DocumentGroups": [
         {
           "DockedWidth": 173,
-          "SelectedChildIndex": 0,
+          "SelectedChildIndex": 3,
           "Children": [
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 2,
               "Title": "main.cpp",
               "DocumentMoniker": "D:\\Desktop\\project\\Cache Policy\\SCORE\\Project1\\main.cpp",
               "RelativeDocumentMoniker": "main.cpp",
               "ToolTip": "D:\\Desktop\\project\\Cache Policy\\SCORE\\Project1\\main.cpp",
               "RelativeToolTip": "main.cpp",
-              "ViewState": "AgIAABcAAAAAAAAAAAAtwC4AAAAHAAAAAAAAAA==",
+              "ViewState": "AgIAAE4AAAAAAAAAAAAAAGEAAAAnAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
               "WhenOpened": "2025-08-03T08:10:03.891Z",
-              "IsPinned": true,
-              "EditorCaption": ""
+              "IsPinned": true
             },
             {
               "$type": "Bookmark",
@@ -80,15 +79,16 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 0,
               "Title": "score.cpp",
               "DocumentMoniker": "D:\\Desktop\\project\\Cache Policy\\SCORE\\Project1\\score.cpp",
               "RelativeDocumentMoniker": "score.cpp",
               "ToolTip": "D:\\Desktop\\project\\Cache Policy\\SCORE\\Project1\\score.cpp",
               "RelativeToolTip": "score.cpp",
-              "ViewState": "AgIAAA0BAAAAAAAAAAAAwB4BAAAYAAAAAAAAAA==",
+              "ViewState": "AgIAAOAAAAAAAAAAAAAkwOcAAAASAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
-              "WhenOpened": "2025-08-07T12:51:59.786Z"
+              "WhenOpened": "2025-08-07T12:51:59.786Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
@@ -104,13 +104,13 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 1,
               "Title": "score.h",
               "DocumentMoniker": "D:\\Desktop\\project\\Cache Policy\\SCORE\\Project1\\score.h",
               "RelativeDocumentMoniker": "score.h",
               "ToolTip": "D:\\Desktop\\project\\Cache Policy\\SCORE\\Project1\\score.h",
               "RelativeToolTip": "score.h",
-              "ViewState": "AgIAAAUAAAAAAAAAAAAAAAQAAAAWAAAAAAAAAA==",
+              "ViewState": "AgIAABQAAAAAAAAAAAAawCQAAAASAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
               "WhenOpened": "2025-08-03T07:53:11.901Z"
             },
@@ -164,7 +164,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 3,
               "Title": "lru.cpp",
               "DocumentMoniker": "D:\\Desktop\\project\\Cache Policy\\SCORE\\Project1\\lru.cpp",
               "RelativeDocumentMoniker": "lru.cpp",

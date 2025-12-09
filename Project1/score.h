@@ -156,8 +156,20 @@ public:
     bool cache_full();
 
 private:
-    std::list<std::pair<int, int>> _items;  ///< LRU风格的链表，存储(target_object_id, cache_address)对
+      //cache缓存层里面,存储的cache对象,是采取索引+ 存储的双层设计  是存储到_items列表中的,这个列表我们使用_table的哈希表来进行快速的查询和操作
+             // 索引是采_table的哈希表来进行快速的查找存储cache对象的位置
+             //存储是采用_items列表来进行存储的,存储cache对象的id 和cache层的物理地址
+
+    std::list<std::pair<int, int>> _items;  //LRU风格的链表，存储(target_object_id, cache_address)对
+
+
+    // 这里的_table.用于存放cache层的缓存数据
+    // 它是一个map结构.键是块号  值是一个迭代器 ,迭代器可以快速的定位_items链表的数据
     std::unordered_map<int, std::list<std::pair<int, int>>::iterator> _table;  ///< 用于O(1)查找链表迭代器的哈希表
+
+
+  
+
     
     std::unordered_map<int, double> scoreTable;  ///< 缓存对象的得分表（当前实现中未使用）
     

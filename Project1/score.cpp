@@ -7,7 +7,7 @@
 
 
 
-// 温度计算函数
+// 温度计算函数  
 std::unordered_map<int, TemperatureRecord> SCORECache::calculateTemperature(const std::vector<trace_line>& trace_records) {
     const double k = 0.5;
 
@@ -63,7 +63,6 @@ std::unordered_map<int, TemperatureRecord> SCORECache::calculateTemperature(cons
 
             // 更新并设置当前对象的访问时间
             it->second.last_access_time = getCurrentTime();
-
         }
     }
     // 在函数内部返回 temperature_table
@@ -233,7 +232,7 @@ int SCORECache::get(const SCOREParams& scoreparam) {
     }
 
     ++_get_count;
-    auto it = _table.find(scoreparam.target);
+    auto it = _table.find(scoreparam.target); //查找trcaline访问的块号是不是在缓存中
     if (it != _table.end()) {
         ++_hit_count;
         _items.splice(_items.begin(), _items, it->second);

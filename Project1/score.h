@@ -59,7 +59,7 @@ public:
      * @param file_name 正在处理的跟踪文件名
      */
     explicit SCORECache(int c, std::string file_name) :
-        _c(c), _file_name(file_name), _hit_count(0), _get_count(0) {}
+        _c(c), _file_name(file_name), _hit_count(0), _get_count(0), _scoresReady(false) {}
     
     // 禁用拷贝构造函数和赋值运算符
     SCORECache(const SCORECache&) = delete;
@@ -155,6 +155,21 @@ public:
      */
     bool cache_full();
 
+    /**
+     * @brief 预计算所有对象的SCORE得分（一次性计算，避免每次淘汰时重复全量计算）
+     * @param trace_records 跟踪行记录向量
+     * 
+     * 该函数会调用：
+     * - calculateTemperature()
+     * - calculateDensity()
+     * - calculateImportance()
+     * - calculateKdensityTable()
+     * - normalizeImportanceTable()
+     * 然后将每个对象的最终得分（k_importance + k_density）存储到 _precomputedScore 中。
+     * 这个函数应该在开始处理trace之前调用一次，或在第一次get()时自动调用。
+     */
+    void precompute_scores(const std::vector<trace_line>& trace_records);
+
 private:
       //cache缓存层里面,存储的cache对象,是采取索引+ 存储的双层设计  是存储到_items列表中的,这个列表我们使用_table的哈希表来进行快速的查询和操作
              // 索引是采_table的哈希表来进行快速的查找存储cache对象的位置
@@ -169,9 +184,13 @@ private:
 
 
   
-
+  
     
     std::unordered_map<int, double> scoreTable;  ///< 缓存对象的得分表（当前实现中未使用）
+    
+    // 预计算相关成员
+    std::unordered_map<int, double> _precomputedScore;  ///< 预计算好的得分表：object_id -> score（k_importance + k_density）
+    bool _scoresReady;  ///< 标志位，表示预计算是否已完成（用于懒加载）
     
     int _c;                    ///< 缓存容量（最大对象数量）
     unsigned int _hit_count;   ///< 缓存命中次数

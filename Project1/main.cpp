@@ -3,14 +3,14 @@
 #include <string>
 #include "arc.h"
 #include "lru.h"
-#include"TDC.h"
+// #include"TDC.h"  // TDC算法暂时不使用
 #include"score.h"
 #include "TraceLine.h"
 #include <vector>
 #include <chrono>
-#include"tiercache.h"
+// #include"tiercache.h"  // TDC相关，暂时不使用
 #include <thread>
-#include"tdc2.h"
+// #include"tdc2.h"  // TDC算法暂时不使用
 
 
 //whc测试
@@ -42,7 +42,7 @@ int main(int argc, char** argv) { // 第一个参数是
     LRUCache lru_cache(c, argv[2]);
     ARCCache arc_cache(c, argv[2]);
     SCORECache score_cache(c, argv[2]);
-    TDCCache tdc_cache(c, argv[2]);
+    // TDCCache tdc_cache(c, argv[2]);  // TDC算法暂时不使用
     trace_line l;
     int access_counter = 0;
     // 在主循环中添加一个计数器
@@ -60,12 +60,12 @@ int main(int argc, char** argv) { // 第一个参数是
         line_count++;  // 每处理一行，计数器+1
         // 更新每个 trace 数据的目前访问时间和最后访问时间戳
         // 计算对象大小
-        int size = l.size_of_blocks * 4096;
+        // int size = l.size_of_blocks * 4096;  // TDC算法暂时不使用
         l.current_time = time(nullptr);  // 使用系统当前时间
         l.access_count = 0;  // 初始化访问次数为0
         // 获取相应的数据
-        int n = 1; // 初始化周期计数器
-        int requestCounter = 0; // 请求计数器
+        // int n = 1; // 初始化周期计数器  // TDC算法暂时不使用
+        // int requestCounter = 0; // 请求计数器  // TDC算法暂时不使用
         //内部的 for 循环则对从文件中读取的每个 trace 数据进行缓存访问的模拟。在每次迭代中，它对当前 trace 数据中描述的块范围进行循环，调用 LRUCache 和 ARCCache 类的 get 方法来模拟从缓存中获取数据。
         //在这个循环内，针对每个块，它执行了一些断言检查，确保缓存访问的正确性。
         for (auto i = l.starting_block; i < (l.starting_block + l.size_of_blocks); ++i) {
@@ -97,15 +97,15 @@ int main(int argc, char** argv) { // 第一个参数是
             SCOREParams scoreparam{ i, trace_records };
             auto res3 = score_cache.get(scoreparam);
             assert(res3 != -1);
-            // TDC算法相关代码
-            // 判断是否达到一个周期
-            if (requestCounter % 160000 == 0) {
-                ++n;
-            }
-            TDCParams tdcParams{ i, n, static_cast<double>(size) };//i对象 n是周期 size缓存大小
-            auto res4 = tdc_cache.get(tdcParams);
-            assert(res4 != -1);
-            requestCounter++;
+            // TDC算法相关代码（暂时不使用）
+            // // 判断是否达到一个周期
+            // if (requestCounter % 160000 == 0) {
+            //     ++n;
+            // }
+            // TDCParams tdcParams{ i, n, static_cast<double>(size) };//i对象 n是周期 size缓存大小
+            // auto res4 = tdc_cache.get(tdcParams);
+            // assert(res4 != -1);
+            // requestCounter++;
         }
         
         // 每100行输出一次进度信息和耗时信息，便于对比时间提升情况
@@ -127,7 +127,7 @@ int main(int argc, char** argv) { // 第一个参数是
     std::cout << lru_cache.statics();
     std::cout << arc_cache.statics();
     std::cout << score_cache.statics();
-    std::cout << tdc_cache.statics();
+    // std::cout << tdc_cache.statics();  // TDC算法暂时不使用
     return 0;
 }
 

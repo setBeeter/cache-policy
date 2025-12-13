@@ -1,6 +1,8 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <ctime>      // 用于 time() 函数
+#include <cassert>   // 用于 assert() 宏
 #include "arc.h"
 #include "lru.h"
 // #include"TDC.h"  // TDC算法暂时不使用

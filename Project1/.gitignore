@@ -1,0 +1,34 @@
+# ---- Visual Studio / MSVC 常见产物 ----
+
+# 解决方案 / 工程生成的中间数据库
+*.sdf
+*.opensdf
+*.VC.db
+*.VC.VC.opendb
+
+# 编译输出目录
+/Project1/x64/
+/Project1/SCORE/x64/
+
+# 通用中间/输出文件
+*.obj
+*.obj.enc
+*.pdb
+*.ilk
+*.idb
+*.tlog
+*.log
+*.lastbuildstate
+*.recipe
+
+# VS 生成的临时文件
+*.ipch
+*.pch
+*.tmp
+*.user
+*.log
+
+# 其他不需要提交的文件
+/.vs/
+
+

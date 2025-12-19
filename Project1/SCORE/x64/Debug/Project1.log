@@ -15,11 +15,27 @@ D:\Desktop\project\Cache Policy\SCORE\Project1\TDC.h(1,1): warning C4819: 该文
 D:\Desktop\project\Cache Policy\SCORE\Project1\score.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
   (编译源文件“main.cpp”)
   
-D:\Desktop\project\Cache Policy\SCORE\Project1\main.cpp(96,52): warning C4244: “=”: 从“double”转换到“time_t”，可能丢失数据
+D:\Desktop\project\Cache Policy\SCORE\Project1\iscore.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+  (编译源文件“main.cpp”)
+  
+D:\Desktop\project\Cache Policy\SCORE\Project1\histogram.h(59,16): warning C4267: “初始化”: 从“size_t”转换到“unsigned int”，可能丢失数据
+  (编译源文件“main.cpp”)
+  
+D:\Desktop\project\Cache Policy\SCORE\Project1\histogram.h(119,24): warning C4267: “参数”: 从“size_t”转换到“unsigned int”，可能丢失数据
+  (编译源文件“main.cpp”)
+  
+D:\Desktop\project\Cache Policy\SCORE\Project1\histogram.h(125,24): warning C4267: “参数”: 从“size_t”转换到“unsigned int”，可能丢失数据
+  (编译源文件“main.cpp”)
+  
   score.cpp
 D:\Desktop\project\Cache Policy\SCORE\Project1\score.cpp(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
 D:\Desktop\project\Cache Policy\SCORE\Project1\score.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
   (编译源文件“score.cpp”)
+  
+  iscore.cpp
+D:\Desktop\project\Cache Policy\SCORE\Project1\iscore.cpp(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+D:\Desktop\project\Cache Policy\SCORE\Project1\iscore.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+  (编译源文件“iscore.cpp”)
   
   TDC.cpp
 D:\Desktop\project\Cache Policy\SCORE\Project1\TDC.cpp(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
@@ -28,11 +44,11 @@ D:\Desktop\project\Cache Policy\SCORE\Project1\TDC.h(1,1): warning C4819: 该文
   
 D:\Desktop\project\Cache Policy\SCORE\Project1\TDC.cpp(26,64): warning C4244: “=”: 从“const double”转换到“int”，可能丢失数据
 D:\Desktop\project\Cache Policy\SCORE\Project1\TDC.cpp(100,64): warning C4244: “=”: 从“const double”转换到“int”，可能丢失数据
-D:\Desktop\project\Cache Policy\SCORE\Project1\TDC.cpp(120,25): warning C4244: “初始化”: 从“_Rep”转换到“double”，可能丢失数据
-D:\Desktop\project\Cache Policy\SCORE\Project1\TDC.cpp(120,25): warning C4244:         with
-D:\Desktop\project\Cache Policy\SCORE\Project1\TDC.cpp(120,25): warning C4244:         [
-D:\Desktop\project\Cache Policy\SCORE\Project1\TDC.cpp(120,25): warning C4244:             _Rep=__int64
-D:\Desktop\project\Cache Policy\SCORE\Project1\TDC.cpp(120,25): warning C4244:         ]
+D:\Desktop\project\Cache Policy\SCORE\Project1\TDC.cpp(116,25): warning C4244: “初始化”: 从“_Rep”转换到“double”，可能丢失数据
+D:\Desktop\project\Cache Policy\SCORE\Project1\TDC.cpp(116,25): warning C4244:         with
+D:\Desktop\project\Cache Policy\SCORE\Project1\TDC.cpp(116,25): warning C4244:         [
+D:\Desktop\project\Cache Policy\SCORE\Project1\TDC.cpp(116,25): warning C4244:             _Rep=__int64
+D:\Desktop\project\Cache Policy\SCORE\Project1\TDC.cpp(116,25): warning C4244:         ]
   tdc2.cpp
 D:\Desktop\project\Cache Policy\SCORE\Project1\histogram.h(59,16): warning C4267: “初始化”: 从“size_t”转换到“unsigned int”，可能丢失数据
   (编译源文件“tdc2.cpp”)

@@ -133,6 +133,7 @@
     <ClInclude Include="histogram.h" />
     <ClInclude Include="lru.h" />
     <ClInclude Include="score.h" />
+    <ClInclude Include="iscore.h" />
     <ClInclude Include="TDC.h" />
     <ClInclude Include="tdc2.h" />
     <ClInclude Include="tiercache.h" />
@@ -143,6 +144,7 @@
     <ClCompile Include="lru.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="score.cpp" />
+    <ClCompile Include="iscore.cpp" />
     <ClCompile Include="TDC.cpp" />
     <ClCompile Include="tdc2.cpp" />
     <ClCompile Include="tiercache.cpp" />

@@ -99,6 +99,7 @@ int main(int argc, char** argv) { // 第一个参数是
             SCOREParams scoreparam{ i, trace_records };
             auto res3 = score_cache.get(scoreparam);
             assert(res3 != -1);
+            
             // TDC算法相关代码
             // 判断是否达到一个周期
             if (requestCounter % 160000 == 0) {

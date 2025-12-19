@@ -84,6 +84,7 @@ int main(int argc, char** argv) { // 第一个参数是
             SCOREParams scoreparam{ i, static_cast<uint32_t>(l.request_number), l.size_of_blocks };
             auto res3 = score_cache.get(scoreparam);
             assert(res3 != -1);
+<<<<<<< HEAD
 
             // ISCORE 使用与 SCORE 相同的逻辑时间和 block_id 作为 key
             ISCOREParams iscore_param{ i, static_cast<uint32_t>(l.request_number), l.size_of_blocks };
@@ -99,6 +100,18 @@ int main(int argc, char** argv) { // 第一个参数是
             // auto res4 = tdc_cache.get(tdcParams);
             // assert(res4 != -1);
             // requestCounter++;
+=======
+            
+            // TDC算法相关代码
+            // 判断是否达到一个周期
+            if (requestCounter % 160000 == 0) {
+                ++n;
+            }
+            TDCParams tdcParams{ i, n, static_cast<double>(size), tdc_cache.temperatureTable };//i对象 n是周期 size缓存大小
+            auto res4 = tdc_cache.get(tdcParams);
+            assert(res4 != -1);
+            requestCounter++;
+>>>>>>> f31377255e60c4430aae1f6d87701cb4fa484c74
         }
         
         // 每100行输出一次进度信息和耗时信息，便于对比时间提升情况

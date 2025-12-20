@@ -1,26 +1,32 @@
+#ifndef BLOOMFILTER_H
+#define BLOOMFILTER_H
+
 #include <set>
-//¸üÏñÊÇÒ»¸ö¼òµ¥µÄ¼¯ºÏ£¨std::set£©°ü×°Æ÷,À´È·ÇĞµØ´æ´¢ºÍ²éÑ¯ÔªËØ
+
+// ç®€å•çš„é›†åˆè¿‡æ»¤å™¨ï¼Œä½¿ç”¨ std::set å°è£…
 class BloomFilter {
 public:
 	BloomFilter(int size) {
-		capacity = size;//ÊµÏÖÖĞÖ¸µÄÊÇ¹ıÂËÆ÷¿ÉÒÔ´æ´¢µÄÔªËØÊıÁ¿ÉÏÏŞ
+		capacity = size;//Êµï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½Ç¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô´æ´¢ï¿½ï¿½Ôªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	}
 	void setBit(unsigned int count) {
 		s.insert(count);
-		--capacity;//Êµ¼ÊÉÏËüÖ»ÊÇ¼òµ¥µØÌí¼ÓÔªËØµ½ std::set ÖĞ
+		--capacity;//Êµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö»ï¿½Ç¼òµ¥µï¿½ï¿½ï¿½ï¿½ï¿½Ôªï¿½Øµï¿½ std::set ï¿½ï¿½
 	}
 
 	bool checkBit(unsigned int count) {
-		return s.find(count) != s.end();//¼ì²é¸ø¶¨µÄÔªËØ£¨count£©ÊÇ·ñÒÑ¾­´æÔÚÓÚ¼¯ºÏ s ÖĞ
+		return s.find(count) != s.end();//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ôªï¿½Ø£ï¿½countï¿½ï¿½ï¿½Ç·ï¿½ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú¼ï¿½ï¿½ï¿½ s ï¿½ï¿½
 	}
 	// bool operator<(const BloomFilter& b) const{
 	// 	return this->vec.size() > b.vec.size();
 	// }
 
 	int remain_capacity() {
-		return capacity;//·µ»Ø²¼Â¡¹ıÂËÆ÷µ±Ç°µÄÊ£ÓàÈİÁ¿£¬¼´»¹¿ÉÒÔÌí¼Ó¶àÉÙ¸öÔªËØ
+		return capacity;//ï¿½ï¿½ï¿½Ø²ï¿½Â¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç°ï¿½ï¿½Ê£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó¶ï¿½ï¿½Ù¸ï¿½Ôªï¿½ï¿½
 	}
 private:
-	std::set<int> s;//ÓÃÓÚ´æ´¢Ìí¼Óµ½¹ıÂËÆ÷ÖĞµÄÔªËØ
-	unsigned int capacity;//¼ÇÂ¼¹ıÂËÆ÷µÄÊ£ÓàÈİÁ¿
+	std::set<int> s;           // ç”¨äºå­˜å‚¨æ·»åŠ çš„å…ƒç´ 
+	unsigned int capacity;     // è®°å½•è¿‡æ»¤å™¨çš„å‰©ä½™å®¹é‡
 };
+
+#endif  // BLOOMFILTER_H

@@ -1,3 +1,5 @@
+#ifndef TDC2_H
+#define TDC2_H
 
 #include "tiercache.h"
 #include <unordered_map>
@@ -9,7 +11,7 @@ using namespace std;
 
 class tdcCache {
 private:
-    list<object_c> obj_set;//╤сап
+    list<object_c> obj_set;//О©╫О©╫О©╫О©╫
     map<int, list<object_c>::iterator> obj_map;
     vector<uint32_t> grade_table;
     pow2_hist_t temp_hist;
@@ -55,3 +57,5 @@ public:
         _next = obj_set.begin();
     }
 };
+
+#endif  // TDC2_H

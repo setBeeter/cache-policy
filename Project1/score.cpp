@@ -3,6 +3,27 @@
 #include <cmath>
 #include <limits>
 
+// 计算给定对象在指定时间点的 SCORE 分数
+double SCORECache::calculateScore(int block_id, uint32_t now_req) {
+    auto meta_it = _meta.find(block_id);
+    if (meta_it == _meta.end()) {
+        return 0.0;  // 对象不在 cache，返回 0
+    }
+
+    const auto& meta = meta_it->second;
+    double age = static_cast<double>(now_req - meta.last_req);
+    if (age < 1.0) age = 1.0;  // 避免除零
+
+    // 计算温度密度
+    double density = meta.temperature / (static_cast<double>(meta.size) * age);
+
+    // 计算重要性
+    double importance = static_cast<double>(meta.freq);
+
+    // 计算综合得分（与原版完全一致）
+    return importance + density * 1000.0;
+}
+
 // 旧版函数已删除，新版 get() 使用在线维护的元数据
 int SCORECache::get(const SCOREParams& params) {
     if (_c <= 0) {
@@ -27,38 +48,47 @@ int SCORECache::get(const SCOREParams& params) {
         meta.last_req = params.now_req;
         meta.freq++;
 
+        // 命中时：更新版本号并 push 新的 heap entry（lazy）
+        _version[params.target]++;
+        double score_now = calculateScore(params.target, params.now_req);
+        _victim_heap.push({score_now, params.target, _version[params.target]});
+
         return _items.front().second;
     }
     else {
         // 未命中
-        if (_items.size() >= _c) {
-            // 缓存满，选择一个 victim 淘汰（O(cache_size) 扫描）
+        if (_items.size() >= static_cast<size_t>(_c)) {
+            // 缓存满，使用 Lazy Heap 选择 victim（O(log N) 均摊复杂度）
             int victim = -1;
-            double min_score = std::numeric_limits<double>::max();
+            const double EPS = 1e-6;  // score 比较阈值
 
-            // 遍历缓存中的所有对象计算 score
-            for (const auto& item : _items) {
-                int block_id = item.first;
-                auto meta_it = _meta.find(block_id);
-                if (meta_it == _meta.end()) continue;
+            // Lazy cleaning：循环直到找到真正的 victim
+            while (!_victim_heap.empty()) {
+                auto top = _victim_heap.top();
+                _victim_heap.pop();
 
-                const auto& meta = meta_it->second;
-                double age = static_cast<double>(params.now_req - meta.last_req);
-                if (age < 1.0) age = 1.0;  // 避免除零
-
-                // 计算温度密度
-                double density = meta.temperature / (static_cast<double>(meta.size) * age);
-                
-                // 计算重要性（简化版：直接用频次，不做全局归一化）
-                double importance = static_cast<double>(meta.freq);
-
-                // 计算综合得分
-                double score = importance + density * 1000.0;  // 放大密度权重使其与频次可比
-
-                if (score < min_score) {
-                    min_score = score;
-                    victim = block_id;
+                // 检查 1：对象已不在 cache（之前被淘汰）
+                if (_table.find(top.key) == _table.end()) {
+                    continue;
                 }
+
+                // 检查 2：版本过期（对象被更新过）
+                if (_version.find(top.key) != _version.end() && top.version != _version[top.key]) {
+                    continue;
+                }
+
+                // 检查 3：score 过期（时间推进导致 score 变化）
+                double score_now = calculateScore(top.key, params.now_req);
+                if (std::fabs(score_now - top.score_snapshot) > EPS) {
+                    // score 已变化，重新 push 到 heap
+                    _version[top.key]++;
+                    _victim_heap.push({score_now, top.key, _version[top.key]});
+                    continue;
+                }
+
+                // 找到真正的 victim
+                victim = top.key;
+                break;
             }
 
             // 淘汰 victim
@@ -68,6 +98,7 @@ int SCORECache::get(const SCOREParams& params) {
                     _items.erase(victim_it->second);
                     _table.erase(victim_it);
                     _meta.erase(victim);
+                    _version.erase(victim);  // 清理版本号
                 }
             }
         }
@@ -83,6 +114,11 @@ int SCORECache::get(const SCOREParams& params) {
         new_meta.freq = 1;
         new_meta.size = params.size_of_blocks * 4096;
         _meta[params.target] = new_meta;
+
+        // 插入时：初始化版本号并 push heap entry
+        _version[params.target] = 1;
+        double score_initial = calculateScore(params.target, params.now_req);
+        _victim_heap.push({score_initial, params.target, 1});
 
         return _items.front().second;
     }

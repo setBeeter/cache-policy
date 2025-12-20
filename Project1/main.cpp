@@ -11,7 +11,7 @@
 #include "TraceLine.h"
 #include <vector>
 #include <chrono>
-#include"tiercache.h"  // TDC相关，暂时不使用
+// #include"tiercache.h"  // Ceph/TierCache 相关，当前实验不使用（避免引入其头文件依赖）
 #include <thread>
 // #include"tdc2.h"  // TDC算法暂时不使用
 

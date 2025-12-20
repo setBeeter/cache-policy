@@ -1,3 +1,5 @@
+#ifndef TDC_H
+#define TDC_H
 
 #include <unordered_map>
 #include <list>
@@ -49,3 +51,5 @@ private:
     unsigned int _get_count;
     std::string _file_name;
 };
+
+#endif  // TDC_H

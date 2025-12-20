@@ -3,6 +3,33 @@
 #include <cmath>
 #include <limits>
 
+// 计算给定对象的 ISCORE 分数（含 interval weight）
+double ISCORECache::calculateScoreWithInterval(int block_id, uint32_t now_req) {
+    auto meta_it = _meta.find(block_id);
+    if (meta_it == _meta.end()) {
+        return 0.0;
+    }
+
+    const auto& meta = meta_it->second;
+    double age = static_cast<double>(now_req - meta.last_req);
+    if (age < 1.0) age = 1.0;
+
+    // 计算温度密度（与 SCORE 一致）
+    double density = meta.temperature / (static_cast<double>(meta.size) * age);
+
+    // 计算重要性
+    double importance = static_cast<double>(meta.freq);
+
+    // 原始 SCORE 分数
+    double score_base = importance + density * 1000.0;
+
+    // 计算 interval 权重（eviction-only）
+    uint64_t rid = regionId(block_id);
+    double weight = wInterval(rid);
+
+    return score_base * weight;
+}
+
 int ISCORECache::get(const ISCOREParams& params) {
     if (_c <= 0) {
         return -1;
@@ -33,44 +60,47 @@ int ISCORECache::get(const ISCOREParams& params) {
         meta.last_req = params.now_req;
         meta.freq++;
 
+        // 命中时：更新版本号并 push 新 heap entry
+        _version[params.target]++;
+        double score_now = calculateScoreWithInterval(params.target, params.now_req);
+        _victim_heap.push({score_now, params.target, _version[params.target]});
+
         return _items.front().second;
     }
     else {
         // 未命中
         if (_items.size() >= static_cast<size_t>(_c)) {
-            // 缓存满，选择一个 victim 淘汰（O(cache_size) 扫描）
+            // 缓存满，使用 Lazy Heap 选择 victim（O(log N) 均摊复杂度）
             int victim = -1;
-            double min_score = std::numeric_limits<double>::max();
+            const double EPS = 1e-6;
 
-            // 遍历缓存中的所有对象计算带 interval 权重的 score
-            for (const auto& item : _items) {
-                int block_id = item.first;
-                auto meta_it = _meta.find(block_id);
-                if (meta_it == _meta.end()) continue;
+            // Lazy cleaning：循环直到找到真正的 victim
+            while (!_victim_heap.empty()) {
+                auto top = _victim_heap.top();
+                _victim_heap.pop();
 
-                const auto& meta = meta_it->second;
-                double age = static_cast<double>(params.now_req - meta.last_req);
-                if (age < 1.0) age = 1.0;
-
-                // 计算温度密度（与 SCORE 完全一致）
-                double density = meta.temperature / (static_cast<double>(meta.size) * age);
-
-                // 计算重要性（简化版：直接用频次）
-                double importance = static_cast<double>(meta.freq);
-
-                // 原始 SCORE 计算逻辑（score_base 保留不变）
-                double score_base = importance + density * 1000.0;
-
-                // 计算该对象所属 region 的 interval 权重（eviction-only）
-                uint64_t rid = regionId(block_id);
-                double weight = wInterval(rid);
-
-                double score_final = score_base * weight;
-
-                if (score_final < min_score) {
-                    min_score = score_final;
-                    victim = block_id;
+                // 检查 1：对象已不在 cache
+                if (_table.find(top.key) == _table.end()) {
+                    continue;
                 }
+
+                // 检查 2：版本过期
+                if (_version.find(top.key) != _version.end() && top.version != _version[top.key]) {
+                    continue;
+                }
+
+                // 检查 3：score 过期（时间推进或 region hotness 变化）
+                double score_now = calculateScoreWithInterval(top.key, params.now_req);
+                if (std::fabs(score_now - top.score_snapshot) > EPS) {
+                    // score 已变化，重新 push
+                    _version[top.key]++;
+                    _victim_heap.push({score_now, top.key, _version[top.key]});
+                    continue;
+                }
+
+                // 找到真正的 victim
+                victim = top.key;
+                break;
             }
 
             // 淘汰 victim
@@ -80,6 +110,7 @@ int ISCORECache::get(const ISCOREParams& params) {
                     _items.erase(victim_it->second);
                     _table.erase(victim_it);
                     _meta.erase(victim);
+                    _version.erase(victim);
                 }
             }
         }
@@ -94,6 +125,11 @@ int ISCORECache::get(const ISCOREParams& params) {
         new_meta.freq = 1;
         new_meta.size = params.size_of_blocks * 4096;
         _meta[params.target] = new_meta;
+
+        // 插入时：初始化版本号并 push heap entry
+        _version[params.target] = 1;
+        double score_initial = calculateScoreWithInterval(params.target, params.now_req);
+        _victim_heap.push({score_initial, params.target, 1});
 
         return _items.front().second;
     }

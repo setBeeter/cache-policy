@@ -1,3 +1,5 @@
+#ifndef ARC_H
+#define ARC_H
 
 #include <cassert>
 #include <list>
@@ -96,7 +98,9 @@ private:
     unsigned int _get_count;
     int _miss_count;  // �����ӵ�δ���м�����
 
-    // �ļ���
+    // 文件名
     std::string _file_name;
 
 };
+
+#endif  // ARC_H

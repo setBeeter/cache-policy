@@ -9,10 +9,17 @@
  * - 重要性（Importance）：访问频率计数
  */
 
+#ifndef SCORE_H
+#define SCORE_H
+
 #include <unordered_map>
 #include <list>
+#include <queue>
+#include <vector>
+#include <functional>
 #include <sstream>
 #include <cstdint>
+#include <cmath>
 #include "TraceLine.h"
 
 /**
@@ -51,6 +58,31 @@ struct SCOREParams {
     int target;              ///< 要访问的目标对象ID（block id）
     uint32_t now_req;        ///< 当前请求号（逻辑时间戳）
     int size_of_blocks;      ///< 对象包含的块数（用于计算大小）
+};
+
+/**
+ * @struct HeapEntry
+ * @brief Lazy Priority Queue 的堆元素
+ * 
+ * 用于维护候选 victim 的最小堆，允许存在过期（stale）的 entry。
+ * eviction 时通过 version 检查来过滤过期数据，避免全表扫描。
+ */
+struct HeapEntry {
+    double score_snapshot;   ///< 记录时的 score 快照（可能已过期）
+    int key;                 ///< 对象的 block_id
+    uint64_t version;        ///< 版本号（每次更新递增）
+
+    // 允许 aggregate 初始化：{score, key, version}
+};
+
+/**
+ * @struct HeapEntryCompare
+ * @brief priority_queue 的比较器（最小堆：score 小的优先出队）
+ */
+struct HeapEntryCompare {
+    bool operator()(const HeapEntry& a, const HeapEntry& b) const {
+        return a.score_snapshot > b.score_snapshot;
+    }
 };
 
 /**
@@ -102,9 +134,17 @@ public:
     std::string statics();
 
 private:
-      //cache缓存层里面,存储的cache对象,是采取索引+ 存储的双层设计  是存储到_items列表中的,这个列表我们使用_table的哈希表来进行快速的查询和操作
-             // 索引是采_table的哈希表来进行快速的查找存储cache对象的位置
-             //存储是采用_items列表来进行存储的,存储cache对象的id 和cache层的物理地址
+    /**
+     * @brief 计算给定对象在指定时间点的 SCORE 分数
+     * @param block_id 对象 ID
+     * @param now_req 当前请求时间戳
+     * @return score 值（importance + density × 1000）
+     */
+    double calculateScore(int block_id, uint32_t now_req);
+
+    //cache缓存层里面,存储的cache对象,是采取索引+ 存储的双层设计  是存储到_items列表中的,这个列表我们使用_table的哈希表来进行快速的查询和操作
+    // 索引是采_table的哈希表来进行快速的查找存储cache对象的位置
+    //存储是采用_items列表来进行存储的,存储cache对象的id 和cache层的物理地址
 
     std::list<std::pair<int, int>> _items;  //LRU风格的链表，存储(target_object_id, cache_address)对
 
@@ -114,9 +154,15 @@ private:
     std::unordered_map<int, std::list<std::pair<int, int>>::iterator> _table;  ///< 用于O(1)查找链表迭代器的哈希表
 
     std::unordered_map<int, Meta> _meta;  ///< 缓存对象的元数据表，key=block id，在线维护温度/频次/大小
+
+    // Lazy Priority Queue 相关字段（用于 O(log N) eviction）
+    std::priority_queue<HeapEntry, std::vector<HeapEntry>, HeapEntryCompare> _victim_heap;  ///< 最小堆：score 最小的在 top
+    std::unordered_map<int, uint64_t> _version;  ///< 每个对象的版本号（命中/插入时递增）
     
     int _c;                    ///< 缓存容量（最大对象数量）
     unsigned int _hit_count;   ///< 缓存命中次数
     unsigned int _get_count;   ///< 缓存请求总次数
     std::string _file_name;    ///< 正在处理的跟踪文件名
 };
+
+#endif  // SCORE_H

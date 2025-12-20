@@ -1,16 +1,13 @@
 #pragma once
 // TraceLine.h
 
-
-
 #include <ctime>
 
 struct trace_line {
-    int starting_block;//oid Õâ¸ö±äÁ¿±íÊ¾Ò»¸öÊı¾İ¿é£¨»òÕß³ÆÎª¶ÔÏó£©µÄÆğÊ¼¿é¡£ÔÚ´æ´¢ÏµÍ³»òÎÄ¼şÏµÍ³µÄÉÏÏÂÎÄÖĞ£¬Ò»¸ö¶ÔÏó¿ÉÄÜÓÉ¶à¸öÏàÁÚµÄ¿é×é³É¡£starting_block Ö¸¶¨ÁËÕâ¸ö¶ÔÏóµÄµÚÒ»¸ö¿éµÄ±àºÅ»òµØÖ·¡£
-    int size_of_blocks;//sizeËü¶¨ÒåÁË¶ÔÏóµÄ´óĞ¡
+    int starting_block;      // èµ·å§‹å—å·
+    int size_of_blocks;      // å—æ•°é‡
     int ignore;
     int request_number;
-    int access_count;  // ĞÂÔö£º¼ÇÂ¼·ÃÎÊ´ÎÊı
-    time_t current_time;  // Ìí¼ÓÄ¿Ç°·ÃÎÊÊ±¼ä
+    int access_count;        // è®¿é—®æ¬¡æ•°
+    time_t current_time;     // å½“å‰è®¿é—®æ—¶é—´
 };
-

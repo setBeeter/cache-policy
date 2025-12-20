@@ -2,8 +2,12 @@
 
 #include <unordered_map>
 #include <list>
+#include <queue>
+#include <vector>
+#include <functional>
 #include <sstream>
 #include <cstdint>
+#include <cmath>
 #include "TraceLine.h"
 
 /**
@@ -40,6 +44,26 @@ struct ISCOREParams {
     int target;              ///< 要访问的目标对象ID（block id）
     uint32_t now_req;        ///< 当前请求号（逻辑时间戳）
     int size_of_blocks;      ///< 对象包含的块数（用于计算大小）
+};
+
+/**
+ * @struct ISHeapEntry
+ * @brief ISCORE 的 Lazy Priority Queue 堆元素
+ */
+struct ISHeapEntry {
+    double score_snapshot;   ///< 记录时的 score 快照（包含 interval weight）
+    int key;                 ///< 对象的 block_id
+    uint64_t version;        ///< 版本号
+};
+
+/**
+ * @struct ISHeapEntryCompare
+ * @brief priority_queue 的比较器（最小堆）
+ */
+struct ISHeapEntryCompare {
+    bool operator()(const ISHeapEntry& a, const ISHeapEntry& b) const {
+        return a.score_snapshot > b.score_snapshot;
+    }
 };
 
 /**
@@ -81,6 +105,11 @@ public:
     std::string statics();
 
 private:
+    /**
+     * @brief 计算给定对象的 ISCORE 分数（含 interval weight）
+     */
+    double calculateScoreWithInterval(int block_id, uint32_t now_req);
+
     // ========== 与 SCORE 相同的缓存结构 ==========
     std::list<std::pair<int, int>> _items;  // LRU 风格链表，存储 (target_object_id, cache_address)
     std::unordered_map<int, std::list<std::pair<int, int>>::iterator> _table;
@@ -101,6 +130,10 @@ private:
     double LAMBDA;               ///< 衰减系数
     double ALPHA;                ///< interval 权重放大系数
     double C;                    ///< 归一化平滑常数
+
+    // Lazy Priority Queue 相关字段（用于 O(log N) eviction）
+    std::priority_queue<ISHeapEntry, std::vector<ISHeapEntry>, ISHeapEntryCompare> _victim_heap;
+    std::unordered_map<int, uint64_t> _version;
 
 private:
     /**

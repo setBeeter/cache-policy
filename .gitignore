@@ -1,0 +1,38 @@
+# Visual Studio / MSBuild
+.vs/
+*.user
+*.suo
+*.VC.db
+*.VC.VC.opendb
+
+# Build outputs
+**/Debug/
+**/Release/
+**/x64/
+**/x86/
+*.obj
+*.exe
+*.pdb
+*.ilk
+*.idb
+*.log
+*.tlog
+*.cache
+*.opendb
+*.db
+*.dll
+*.lib
+*.exp
+*.iobj
+*.ipdb
+
+# VS intermediate files
+*.vcxproj.FileListAbsolute.txt
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+

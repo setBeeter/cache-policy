@@ -1,0 +1,4 @@
+trace:C:\Users\Administrator\Desktop\cacah-test\Cache-data-process\P1-10k.txt lru_cache: cache_size:1000 request:210734 hit:3556 miss:207178 hit_rate:0.0168744
+trace:C:\Users\Administrator\Desktop\cacah-test\Cache-data-process\P1-10k.txt arc_cache: cache_size:1000 request:210734 hit:2844 miss:206336 hit_rate:0.0134957
+trace:C:\Users\Administrator\Desktop\cacah-test\Cache-data-process\P1-10k.txt score_cache: cache_size:1000 request:210734 hit:2650 hit_rate:0.0125751
+trace:C:\Users\Administrator\Desktop\cacah-test\Cache-data-process\P1-10k.txt ISCORE_cache: cache_size:1000 request:210734 hit:2714 hit_rate:0.0128788

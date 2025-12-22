@@ -2,13 +2,14 @@
 
 #include <unordered_map>
 #include <list>
-#include <queue>
 #include <vector>
 #include <functional>
 #include <sstream>
+#include <string>
 #include <cstdint>
 #include <cmath>
 #include "TraceLine.h"
+#include "updatable_min_heap.h"
 
 /**
  * @struct ISTemperatureRecord
@@ -47,26 +48,6 @@ struct ISCOREParams {
 };
 
 /**
- * @struct ISHeapEntry
- * @brief ISCORE 的 Lazy Priority Queue 堆元素
- */
-struct ISHeapEntry {
-    double score_snapshot;   ///< 记录时的 score 快照（包含 interval weight）
-    int key;                 ///< 对象的 block_id
-    uint64_t version;        ///< 版本号
-};
-
-/**
- * @struct ISHeapEntryCompare
- * @brief priority_queue 的比较器（最小堆）
- */
-struct ISHeapEntryCompare {
-    bool operator()(const ISHeapEntry& a, const ISHeapEntry& b) const {
-        return a.score_snapshot > b.score_snapshot;
-    }
-};
-
-/**
  * @class ISCORECache
  * @brief 带 interval-hotness 权重的 SCORE 扩展版本
  *
@@ -79,14 +60,27 @@ class ISCORECache {
 public:
     explicit ISCORECache(int c, std::string file_name) :
         _c(c),
-        _file_name(file_name),
         _hit_count(0),
         _get_count(0),
+        _file_name(std::move(file_name)),
         _access_seq(0),
-        REGION_SIZE_BLOCKS(1024), // 默认 4MB / 4KB block（本工程中 block_id 即 trace_line.starting_block+i）
-        LAMBDA(1.0 / 100000.0),
-        ALPHA(0.3),
-        C(5.0) {}
+        // trace 中 block=512B；若按 4MB region，则 region 大小应为 4MB / 512B = 8192 blocks
+        _region_size_blocks(8192),
+        // 逻辑时间粒度为“每个 block 访问一次”，适度加快 region 热度衰减，避免历史热度长时间不消退
+        _lambda(1.0 / 10000.0),
+        _alpha(0.3),
+        _smooth_c(5.0) {
+        // 大 cache 下减少哈希表 rehash 以及堆扩容带来的抖动（不改变策略语义）
+        if (_c > 0) {
+            _table.reserve(static_cast<size_t>(_c) * 2 + 1);
+            _meta.reserve(static_cast<size_t>(_c) * 2 + 1);
+            _victim_heap.reserve(static_cast<size_t>(_c) + 1);
+
+            // region 数量大致为 (key_space / region_size)，这里按 cache size 做一个保守上限
+            _region_hot.reserve(static_cast<size_t>(_c) / 4 + 1);
+            _region_last_seq.reserve(static_cast<size_t>(_c) / 4 + 1);
+        }
+    }
 
     ISCORECache(const ISCORECache&) = delete;
     ISCORECache& operator=(const ISCORECache&) = delete;
@@ -126,14 +120,14 @@ private:
 
     uint64_t _access_seq;      ///< 全局逻辑时间（这里直接使用 now_req 作为访问序号）
 
-    uint64_t REGION_SIZE_BLOCKS; ///< region 大小（以 block 数计）
-    double LAMBDA;               ///< 衰减系数
-    double ALPHA;                ///< interval 权重放大系数
-    double C;                    ///< 归一化平滑常数
+    // 这些名字在某些环境/库里容易与宏冲突（尤其是单字母 C），使用更安全的成员名避免 Release 配置下被宏污染
+    uint64_t _region_size_blocks; ///< region 大小（以 block 数计）
+    double _lambda;               ///< 衰减系数
+    double _alpha;                ///< interval 权重放大系数
+    double _smooth_c;             ///< 归一化平滑常数
 
-    // Lazy Priority Queue 相关字段（用于 O(log N) eviction）
-    std::priority_queue<ISHeapEntry, std::vector<ISHeapEntry>, ISHeapEntryCompare> _victim_heap;
-    std::unordered_map<int, uint64_t> _version;
+    // 可更新最小堆：每个对象在堆内最多一个节点，避免 lazy entry 随访问次数膨胀
+    UpdatableMinHeap _victim_heap;
 
 private:
     /**

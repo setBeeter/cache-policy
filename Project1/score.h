@@ -14,13 +14,13 @@
 
 #include <unordered_map>
 #include <list>
-#include <queue>
 #include <vector>
 #include <functional>
 #include <sstream>
 #include <cstdint>
 #include <cmath>
 #include "TraceLine.h"
+#include "updatable_min_heap.h"
 
 /**
  * @struct TemperatureRecord
@@ -61,31 +61,6 @@ struct SCOREParams {
 };
 
 /**
- * @struct HeapEntry
- * @brief Lazy Priority Queue 的堆元素
- * 
- * 用于维护候选 victim 的最小堆，允许存在过期（stale）的 entry。
- * eviction 时通过 version 检查来过滤过期数据，避免全表扫描。
- */
-struct HeapEntry {
-    double score_snapshot;   ///< 记录时的 score 快照（可能已过期）
-    int key;                 ///< 对象的 block_id
-    uint64_t version;        ///< 版本号（每次更新递增）
-
-    // 允许 aggregate 初始化：{score, key, version}
-};
-
-/**
- * @struct HeapEntryCompare
- * @brief priority_queue 的比较器（最小堆：score 小的优先出队）
- */
-struct HeapEntryCompare {
-    bool operator()(const HeapEntry& a, const HeapEntry& b) const {
-        return a.score_snapshot > b.score_snapshot;
-    }
-};
-
-/**
  * @class SCORECache
  * @brief SCORE缓存替换算法实现类
  * 
@@ -105,7 +80,14 @@ public:
      * @param file_name 正在处理的跟踪文件名
      */
     explicit SCORECache(int c, std::string file_name) :
-        _c(c), _file_name(file_name), _hit_count(0), _get_count(0) {}
+        _c(c), _hit_count(0), _get_count(0), _file_name(std::move(file_name)) {
+        // 大 cache 下减少哈希表 rehash 以及堆扩容带来的抖动（不改变策略语义）
+        if (_c > 0) {
+            _table.reserve(static_cast<size_t>(_c) * 2 + 1);
+            _meta.reserve(static_cast<size_t>(_c) * 2 + 1);
+            _victim_heap.reserve(static_cast<size_t>(_c) + 1);
+        }
+    }
     
     // 禁用拷贝构造函数和赋值运算符
     SCORECache(const SCORECache&) = delete;
@@ -155,9 +137,8 @@ private:
 
     std::unordered_map<int, Meta> _meta;  ///< 缓存对象的元数据表，key=block id，在线维护温度/频次/大小
 
-    // Lazy Priority Queue 相关字段（用于 O(log N) eviction）
-    std::priority_queue<HeapEntry, std::vector<HeapEntry>, HeapEntryCompare> _victim_heap;  ///< 最小堆：score 最小的在 top
-    std::unordered_map<int, uint64_t> _version;  ///< 每个对象的版本号（命中/插入时递增）
+    // 可更新最小堆：每个对象在堆内最多一个节点，避免 lazy entry 随访问次数膨胀
+    UpdatableMinHeap _victim_heap;
     
     int _c;                    ///< 缓存容量（最大对象数量）
     unsigned int _hit_count;   ///< 缓存命中次数

@@ -5,14 +5,12 @@
 #include <cassert>   // 用于 assert() 宏
 #include "arc.h"
 #include "lru.h"
-#include"TDC.h"
 #include"score.h"
 #include"iscore.h"
 #include "TraceLine.h"
 #include <vector>
 #include <chrono>
 // #include"tiercache.h"  // Ceph/TierCache 相关，当前实验不使用（避免引入其头文件依赖）
-#include <thread>
 // #include"tdc2.h"  // TDC算法暂时不使用
 #include <sstream>     // 用于字符串流
 #include <iomanip>     // 用于日期格式化
@@ -75,20 +73,21 @@ int main(int argc, char** argv) { // 第一个参数是
         //内部的 for 循环则对从文件中读取的每个 trace 数据进行缓存访问的模拟。在每次迭代中，它对当前 trace 数据中描述的块范围进行循环，调用 LRUCache 和 ARCCache 类的 get 方法来模拟从缓存中获取数据。
         //在这个循环内，针对每个块，它执行了一些断言检查，确保缓存访问的正确性。
         for (auto i = l.starting_block; i < (l.starting_block + l.size_of_blocks); ++i) {
-            // 增加计数器
-            
             auto res1 = lru_cache.get(i);
             assert(res1 != -1);
             auto res2 = arc_cache.get(i);
             assert(res2 != -1);
 
-            // SCORE算法：使用逻辑时间戳（request_number）
-            SCOREParams scoreparam{ i, static_cast<uint32_t>(l.request_number), l.size_of_blocks };
+            // SCORE/ISCORE：使用“每个 block 访问递增”的逻辑时间，避免同一行内多个 block 共享同一个时间戳
+            // 同时，对单个 block 来说对象大小就是 1 个 block（trace 中每个 block 为 512B；大小换算在 score/iscore 内部完成）
+            uint32_t now_req = static_cast<uint32_t>(++access_counter);
+
+            SCOREParams scoreparam{ i, now_req, 1 };
             auto res3 = score_cache.get(scoreparam);
             assert(res3 != -1);
 
             // ISCORE 使用与 SCORE 相同的逻辑时间和 block_id 作为 key
-            ISCOREParams iscore_param{ i, static_cast<uint32_t>(l.request_number), l.size_of_blocks };
+            ISCOREParams iscore_param{ i, now_req, 1 };
             auto res_is = iscore_cache.get(iscore_param);
             assert(res_is != -1);
 

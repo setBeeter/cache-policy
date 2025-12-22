@@ -1,7 +1,15 @@
 #include "score.h"
 #include <iostream>
 #include <cmath>
-#include <limits>
+
+namespace {
+// 以 “每个 block 访问递增一次 now_req” 为时间粒度时，原先 exp(-0.5*age) 衰减过于激进，
+// 会让温度快速归零，算法退化成近似 LFU，命中率往往显著劣于 LRU。
+// 这里重标定温度更新，使其在该粒度下仍然能体现“最近性”。
+constexpr double kTempLambda = 1e-3;     // 温度指数衰减系数；半衰期约 693 次访问
+constexpr double kTempAdd = 1.0;         // 每次访问增加的温度增量
+constexpr double kDensityScale = 1.0;    // 密度项缩放（原先 *1000 在新温度尺度下容易过大）
+}
 
 // 计算给定对象在指定时间点的 SCORE 分数
 double SCORECache::calculateScore(int block_id, uint32_t now_req) {
@@ -18,10 +26,11 @@ double SCORECache::calculateScore(int block_id, uint32_t now_req) {
     double density = meta.temperature / (static_cast<double>(meta.size) * age);
 
     // 计算重要性
-    double importance = static_cast<double>(meta.freq);
+    // 使用 log1p 限制“老热点频次累积”对 score 的碾压效应，更符合缓存的短期局部性
+    double importance = std::log1p(static_cast<double>(meta.freq));
 
     // 计算综合得分（与原版完全一致）
-    return importance + density * 1000.0;
+    return importance + density * kDensityScale;
 }
 
 // 旧版函数已删除，新版 get() 使用在线维护的元数据
@@ -43,51 +52,44 @@ int SCORECache::get(const SCOREParams& params) {
         double age = static_cast<double>(params.now_req - meta.last_req);
         if (age < 1.0) age = 1.0;  // 防止除零或负值
         
-        // 温度指数衰减后增加 1000.0
-        meta.temperature = meta.temperature * std::exp(-0.5 * age) + 1000.0;
+        // 温度指数衰减后增加 kTempAdd（按每-block 时间粒度重标定）
+        meta.temperature = meta.temperature * std::exp(-kTempLambda * age) + kTempAdd;
         meta.last_req = params.now_req;
         meta.freq++;
 
-        // 命中时：更新版本号并 push 新的 heap entry（lazy）
-        _version[params.target]++;
+        // 命中时：更新该对象在堆中的 score（每个 key 仅一条记录）
         double score_now = calculateScore(params.target, params.now_req);
-        _victim_heap.push({score_now, params.target, _version[params.target]});
+        _victim_heap.upsert(params.target, score_now);
 
         return _items.front().second;
     }
     else {
         // 未命中
         if (_items.size() >= static_cast<size_t>(_c)) {
-            // 缓存满，使用 Lazy Heap 选择 victim（O(log N) 均摊复杂度）
+            // 缓存满：使用可更新最小堆选择 victim
             int victim = -1;
             const double EPS = 1e-6;  // score 比较阈值
 
-            // Lazy cleaning：循环直到找到真正的 victim
+            // 通过“刷新堆顶直到稳定”的方式，保证淘汰按当前 now_req 的精确分数进行（不牺牲命中率语义）
             while (!_victim_heap.empty()) {
-                auto top = _victim_heap.top();
-                _victim_heap.pop();
+                const auto top = _victim_heap.top();
 
-                // 检查 1：对象已不在 cache（之前被淘汰）
+                // 安全检查：堆顶不在 cache，直接弹出（理论上不应发生，因为淘汰时会同步 erase）
                 if (_table.find(top.key) == _table.end()) {
+                    _victim_heap.pop();
                     continue;
                 }
 
-                // 检查 2：版本过期（对象被更新过）
-                if (_version.find(top.key) != _version.end() && top.version != _version[top.key]) {
-                    continue;
-                }
-
-                // 检查 3：score 过期（时间推进导致 score 变化）
                 double score_now = calculateScore(top.key, params.now_req);
-                if (std::fabs(score_now - top.score_snapshot) > EPS) {
-                    // score 已变化，重新 push 到 heap
-                    _version[top.key]++;
-                    _victim_heap.push({score_now, top.key, _version[top.key]});
+                if (std::fabs(score_now - top.score) > EPS) {
+                    // 分数随时间推进发生变化：更新该 key 的 score 并重新堆化
+                    _victim_heap.upsert(top.key, score_now);
                     continue;
                 }
 
-                // 找到真正的 victim
+                // 堆顶已是当前时刻的最小分对象
                 victim = top.key;
+                _victim_heap.pop();
                 break;
             }
 
@@ -98,8 +100,9 @@ int SCORECache::get(const SCOREParams& params) {
                     _items.erase(victim_it->second);
                     _table.erase(victim_it);
                     _meta.erase(victim);
-                    _version.erase(victim);  // 清理版本号
                 }
+                // 同步从堆中移除（若已 pop 则 no-op）
+                _victim_heap.erase(victim);
             }
         }
 
@@ -109,16 +112,16 @@ int SCORECache::get(const SCOREParams& params) {
 
         // 初始化元数据
         Meta new_meta;
-        new_meta.temperature = 1000.0;
+        new_meta.temperature = kTempAdd;
         new_meta.last_req = params.now_req;
         new_meta.freq = 1;
-        new_meta.size = params.size_of_blocks * 4096;
+        // trace 中每个 block 为 512 bytes
+        new_meta.size = params.size_of_blocks * 512;
         _meta[params.target] = new_meta;
 
-        // 插入时：初始化版本号并 push heap entry
-        _version[params.target] = 1;
+        // 插入时：插入/更新堆 entry
         double score_initial = calculateScore(params.target, params.now_req);
-        _victim_heap.push({score_initial, params.target, 1});
+        _victim_heap.upsert(params.target, score_initial);
 
         return _items.front().second;
     }

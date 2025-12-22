@@ -1,4 +1,0 @@
-trace:D:\Desktop\project\Cache-data-process\P2.lis-10K.txt lru_cache: cache_size:10000 request:223472 hit:19417 miss:204055 hit_rate:0.0868878
-trace:D:\Desktop\project\Cache-data-process\P2.lis-10K.txt arc_cache: cache_size:10000 request:223472 hit:22348 miss:187900 hit_rate:0.100004
-trace:D:\Desktop\project\Cache-data-process\P2.lis-10K.txt score_cache: cache_size:10000 request:223472 hit:5348 hit_rate:0.0239314
-trace:D:\Desktop\project\Cache-data-process\P2.lis-10K.txt ISCORE_cache: cache_size:10000 request:223472 hit:11571 hit_rate:0.0517783

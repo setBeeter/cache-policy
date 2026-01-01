@@ -1,40 +1,147 @@
 #include "iscore.h"
 #include <iostream>
 #include <cmath>
+#include <algorithm>
+#include <chrono>
+#include <limits>
+#include <cassert>
 
-namespace {
-// 与 SCORE 同步的温度重标定（时间粒度：每个 block 访问递增一次 now_req）
-constexpr double kTempLambda = 1e-3;     // 半衰期约 693 次访问
-constexpr double kTempAdd = 1.0;
-constexpr double kDensityScale = 1.0;
-}
+// ========== 计时全局变量 ==========
+double g_t_evict_ns = 0.0;
+double g_t_evict_traverse_ns = 0.0;
+uint64_t g_evict_count = 0;
 
-// 计算给定对象的 ISCORE 分数（含 interval weight）
-double ISCORECache::calculateScoreWithInterval(int block_id, uint32_t now_req) {
-    auto meta_it = _meta.find(block_id);
-    if (meta_it == _meta.end()) {
-        return 0.0;
+// ========================================================================
+// 构造函数
+// ========================================================================
+
+ISCORECache::ISCORECache(int c, std::string file_name,
+                         double lambda, double c_smooth, int evict_k)
+    : _c(c),
+      _p(c / 2),  // 初始 p = C/2
+      _hit_count(0),
+      _get_count(0),
+      _file_name(std::move(file_name)),
+      _lambda(lambda),
+      _c_smooth(c_smooth),
+      _evict_k(evict_k)
+{
+    if (_c > 0) {
+        _t1_pos.reserve(static_cast<size_t>(_c) * 2 + 1);
+        _t2_pos.reserve(static_cast<size_t>(_c) * 2 + 1);
+        _b1_pos.reserve(static_cast<size_t>(_c) * 2 + 1);
+        _b2_pos.reserve(static_cast<size_t>(_c) * 2 + 1);
     }
 
-    const auto& meta = meta_it->second;
-    double age = static_cast<double>(now_req - meta.last_req);
-    if (age < 1.0) age = 1.0;
-
-    // 计算温度密度（与 SCORE 一致）
-    double density = meta.temperature / (static_cast<double>(meta.size) * age);
-
-    // 计算重要性
-    double importance = std::log1p(static_cast<double>(meta.freq));
-
-    // 原始 SCORE 分数
-    double score_base = importance + density * kDensityScale;
-
-    // 计算 interval 权重（eviction-only）
-    uint64_t rid = regionId(block_id);
-    double weight = wInterval(rid);
-
-    return score_base * weight;
+    printConfig();
 }
+
+// ========================================================================
+// 启动时打印配置
+// ========================================================================
+
+void ISCORECache::printConfig() {
+    std::cout << "\n========== ARC (Adaptive Replacement Cache) ==========\n";
+    std::cout << "  Capacity (C):          " << _c << "\n";
+    std::cout << "  Initial p:             " << _p << "\n";
+    std::cout << "  Constraints:           |T1|+|T2| <= C, |B1|+|B2| <= C\n";
+    std::cout << "========================================================\n\n";
+}
+
+// ========================================================================
+// 辅助函数：从队列删除
+// ========================================================================
+
+void ISCORECache::removeFromQueue(int obj_id, std::list<int>& queue,
+                                   std::unordered_map<int, std::list<int>::iterator>& pos_map) {
+    auto it = pos_map.find(obj_id);
+    if (it != pos_map.end()) {
+        queue.erase(it->second);
+        pos_map.erase(it);
+    }
+}
+
+// ========================================================================
+// 辅助函数：添加到 MRU（头部）
+// ========================================================================
+
+void ISCORECache::addToMRU(int obj_id, std::list<int>& queue,
+                            std::unordered_map<int, std::list<int>::iterator>& pos_map) {
+    // 确保对象不在队列中（先删除）
+    removeFromQueue(obj_id, queue, pos_map);
+    
+    queue.push_front(obj_id);
+    pos_map[obj_id] = queue.begin();
+}
+
+// ========================================================================
+// Replace 函数：根据 p 决定从 T1 还是 T2 淘汰
+// ========================================================================
+
+void ISCORECache::replace() {
+    int t1_size = static_cast<int>(_t1.size());
+    int b1_size = static_cast<int>(_b1.size());
+    int b2_size = static_cast<int>(_b2.size());
+    
+    // ARC Replace 逻辑：如果 |T1| >= 1 且 (|T1| > p 或 (|T1| == p 且 T2 为空))
+    // 从 T1 淘汰；否则从 T2 淘汰
+    if (t1_size > 0 && (t1_size > _p || (t1_size == _p && _t2.empty()))) {
+        // 从 T1 LRU 移动到 B1 MRU
+        int victim = _t1.back();
+        _t1.pop_back();
+        _t1_pos.erase(victim);
+        
+        // B1 容量限制：|B1| + |B2| <= C
+        if (b1_size + b2_size >= _c && !_b1.empty()) {
+            // 如果 B1+B2 已满，删除 B1 的 LRU
+            int old = _b1.back();
+            _b1.pop_back();
+            _b1_pos.erase(old);
+        }
+        _b1.push_front(victim);
+        _b1_pos[victim] = _b1.begin();
+        
+        ++_evict_from_t1;
+    } else {
+        // 从 T2 LRU 移动到 B2 MRU
+        if (!_t2.empty()) {
+            int victim = _t2.back();
+            _t2.pop_back();
+            _t2_pos.erase(victim);
+            
+            // B2 容量限制：|B1| + |B2| <= C
+            if (b1_size + b2_size >= _c && !_b2.empty()) {
+                // 如果 B1+B2 已满，删除 B2 的 LRU
+                int old = _b2.back();
+                _b2.pop_back();
+                _b2_pos.erase(old);
+            }
+            _b2.push_front(victim);
+            _b2_pos[victim] = _b2.begin();
+            
+            ++_evict_from_t2;
+        }
+    }
+}
+
+// ========================================================================
+// 检查容量约束（断言）
+// ========================================================================
+
+void ISCORECache::checkConstraints() const {
+    int t1_size = static_cast<int>(_t1.size());
+    int t2_size = static_cast<int>(_t2.size());
+    int b1_size = static_cast<int>(_b1.size());
+    int b2_size = static_cast<int>(_b2.size());
+    
+    assert(t1_size + t2_size <= _c);  // |T1| + |T2| <= C
+    assert(b1_size + b2_size <= _c);  // |B1| + |B2| <= C
+    assert(t1_size + t2_size + b1_size + b2_size <= 2 * _c);  // 总结构 <= 2C
+}
+
+// ========================================================================
+// 主要 get 函数（标准 ARC 逻辑）
+// ========================================================================
 
 int ISCORECache::get(const ISCOREParams& params) {
     if (_c <= 0) {
@@ -42,163 +149,196 @@ int ISCORECache::get(const ISCOREParams& params) {
     }
 
     ++_get_count;
+    int x = params.target;
 
-    // 使用 SCORE 中同样的逻辑时间：这里直接将 request_number 视为访问序号
-    _access_seq = static_cast<uint64_t>(params.now_req);
+    // 检查 x 在哪个队列
+    bool in_t1 = (_t1_pos.find(x) != _t1_pos.end());
+    bool in_t2 = (_t2_pos.find(x) != _t2_pos.end());
+    bool in_b1 = (_b1_pos.find(x) != _b1_pos.end());
+    bool in_b2 = (_b2_pos.find(x) != _b2_pos.end());
 
-    // 每次访问（命中或未命中）都要更新其所在 region 的 interval-hotness
-    uint64_t rid_current = regionId(params.target);
-    updateRegionHot(rid_current);
+    // 断言：对象不能同时存在于多个队列
+    assert((in_t1 ? 1 : 0) + (in_t2 ? 1 : 0) + (in_b1 ? 1 : 0) + (in_b2 ? 1 : 0) <= 1);
 
-    auto it = _table.find(params.target);
+    auto t0_evict = std::chrono::steady_clock::now();
 
-    if (it != _table.end()) {
-        // 命中：移动到链表头部
+    if (in_t1 || in_t2) {
+        // ========== Case I: x in T1 or T2 (hit) ==========
         ++_hit_count;
-        _items.splice(_items.begin(), _items, it->second);
 
-        // O(1) 更新元数据（保持与 SCORE 相同逻辑）
-        auto& meta = _meta[params.target];
-        double age = static_cast<double>(params.now_req - meta.last_req);
-        if (age < 1.0) age = 1.0;
-
-        meta.temperature = meta.temperature * std::exp(-kTempLambda * age) + kTempAdd;
-        meta.last_req = params.now_req;
-        meta.freq++;
-
-        // 命中时：更新该对象在堆中的 score（每个 key 仅一条记录）
-        double score_now = calculateScoreWithInterval(params.target, params.now_req);
-        _victim_heap.upsert(params.target, score_now);
-
-        return _items.front().second;
+        if (in_t1) {
+            // x in T1: move from T1 to MRU of T2
+            removeFromQueue(x, _t1, _t1_pos);
+            addToMRU(x, _t2, _t2_pos);
+            ++_t1_hit;
+        } else {
+            // x in T2: move to MRU of T2
+            removeFromQueue(x, _t2, _t2_pos);
+            addToMRU(x, _t2, _t2_pos);
+            ++_t2_hit;
+        }
     }
-    else {
-        // 未命中
-        if (_items.size() >= static_cast<size_t>(_c)) {
-            // 缓存满：使用可更新最小堆选择 victim
-            int victim = -1;
-            const double EPS = 1e-6;
+    else if (in_b1) {
+        // ========== Case II: x in B1 (ghost hit - 属于 MISS) ==========
+        // ✓ Ghost hit 不算 cache hit（对象不在 T1/T2，需要从后端加载）
+        // ✓ 断言：B1 命中必须发生在 cache miss 路径（x 不在 T1/T2）
+        assert(!in_t1 && !in_t2);
+        
+        ++_b1_hit;
 
-            // 通过“刷新堆顶直到稳定”的方式，保证淘汰按当前 now_req 的精确分数（包含 interval 权重）进行
-            while (!_victim_heap.empty()) {
-                const auto top = _victim_heap.top();
-
-                // 安全检查：堆顶不在 cache，直接弹出（理论上不应发生，因为淘汰时会同步 erase）
-                if (_table.find(top.key) == _table.end()) {
-                    _victim_heap.pop();
-                    continue;
-                }
-
-                double score_now = calculateScoreWithInterval(top.key, params.now_req);
-                if (std::fabs(score_now - top.score) > EPS) {
-                    _victim_heap.upsert(top.key, score_now);
-                    continue;
-                }
-
-                victim = top.key;
-                _victim_heap.pop();
-                break;
-            }
-
-            // 淘汰 victim
-            if (victim != -1) {
-                auto victim_it = _table.find(victim);
-                if (victim_it != _table.end()) {
-                    _items.erase(victim_it->second);
-                    _table.erase(victim_it);
-                    _meta.erase(victim);
-                }
-                _victim_heap.erase(victim);
-            }
+        // 调整 p: p = min(C, p + max(1, |B2|/|B1|))
+        int b1_size = static_cast<int>(_b1.size());
+        int b2_size = static_cast<int>(_b2.size());
+        if (b1_size > 0) {
+            int delta = std::max(1, b2_size / b1_size);
+            _p = std::min(_c, _p + delta);
         }
 
-        // 插入新对象（与 SCORE 相同逻辑）
-        _items.emplace_front(params.target, params.target);
-        _table[params.target] = _items.begin();
+        // Replace
+        replace();
 
-        ISMeta new_meta;
-        new_meta.temperature = kTempAdd;
-        new_meta.last_req = params.now_req;
-        new_meta.freq = 1;
-        // trace 中每个 block 为 512 bytes
-        new_meta.size = params.size_of_blocks * 512;
-        _meta[params.target] = new_meta;
-
-        // 插入时：插入/更新堆 entry
-        double score_initial = calculateScoreWithInterval(params.target, params.now_req);
-        _victim_heap.upsert(params.target, score_initial);
-
-        return _items.front().second;
+        // move x from B1 to MRU of T2
+        removeFromQueue(x, _b1, _b1_pos);
+        addToMRU(x, _t2, _t2_pos);
     }
+    else if (in_b2) {
+        // ========== Case III: x in B2 (ghost hit - 属于 MISS) ==========
+        // ✓ Ghost hit 不算 cache hit（对象不在 T1/T2，需要从后端加载）
+        // ✓ 断言：B2 命中必须发生在 cache miss 路径（x 不在 T1/T2）
+        assert(!in_t1 && !in_t2);
+        
+        ++_b2_hit;
+
+        // 调整 p: p = max(0, p - max(1, |B1|/|B2|))
+        int b1_size = static_cast<int>(_b1.size());
+        int b2_size = static_cast<int>(_b2.size());
+        if (b2_size > 0) {
+            int delta = std::max(1, b1_size / b2_size);
+            _p = std::max(0, _p - delta);
+        }
+
+        // Replace
+        replace();
+
+        // move x from B2 to MRU of T2
+        removeFromQueue(x, _b2, _b2_pos);
+        addToMRU(x, _t2, _t2_pos);
+    }
+    else {
+        // ========== Case IV: x is new (miss) ==========
+
+        int t1_size = static_cast<int>(_t1.size());
+        int t2_size = static_cast<int>(_t2.size());
+        int b1_size = static_cast<int>(_b1.size());
+        int b2_size = static_cast<int>(_b2.size());
+        int total = t1_size + t2_size + b1_size + b2_size;
+
+        if (t1_size + b1_size == _c) {
+            // if |T1| + |B1| == C:
+            if (t1_size < _c) {
+                // if |T1| < C: evict LRU from B1, then Replace
+                if (!_b1.empty()) {
+                    int old = _b1.back();
+                    _b1.pop_back();
+                    _b1_pos.erase(old);
+                }
+                replace();
+            } else {
+                // else (|T1| == C): evict LRU from T1 (move to B1)
+                if (!_t1.empty()) {
+                    int victim = _t1.back();
+                    _t1.pop_back();
+                    _t1_pos.erase(victim);
+                    
+                    // B1 容量限制：如果 B1+B2 >= C，需要删除 B1 的 LRU
+                    if (b1_size + b2_size >= _c && !_b1.empty()) {
+                        int old = _b1.back();
+                        _b1.pop_back();
+                        _b1_pos.erase(old);
+                    }
+                    _b1.push_front(victim);
+                    _b1_pos[victim] = _b1.begin();
+                    ++_evict_from_t1;
+                }
+            }
+        } else if (t1_size + t2_size + b1_size + b2_size >= _c) {
+            // else if |T1|+|T2|+|B1|+|B2| >= C:
+            if (total >= 2 * _c) {
+                // if total >= 2C: evict LRU from B2
+                if (!_b2.empty()) {
+                    int old = _b2.back();
+                    _b2.pop_back();
+                    _b2_pos.erase(old);
+                }
+            }
+            replace();
+        }
+
+        // 确保 T1+T2 有空间（在插入 x 之前）
+        if (static_cast<int>(_t1.size()) + static_cast<int>(_t2.size()) >= _c) {
+            replace();
+        }
+
+        // insert x into MRU of T1
+        addToMRU(x, _t1, _t1_pos);
+        ++g_evict_count;
+    }
+
+    auto t1_evict = std::chrono::steady_clock::now();
+    g_t_evict_ns += std::chrono::duration<double, std::nano>(t1_evict - t0_evict).count();
+
+    // 检查约束
+    checkConstraints();
+
+    // 可选：定期打印 p
+    if (_get_count % ARCConfig::P_PRINT_INTERVAL == 0) {
+        std::cout << "[ARC] request=" << _get_count << " p=" << _p << std::endl;
+    }
+
+    return params.target;
 }
+
+// ========================================================================
+// 统计输出
+// ========================================================================
 
 std::string ISCORECache::statics() {
+    // 计算统计
+    uint64_t real_hit_cnt = _t1_hit + _t2_hit;       // 真命中（T1+T2）
+    uint64_t ghost_hit_cnt = _b1_hit + _b2_hit;      // ghost 命中（属于 miss）
+    double real_hit_rate = (_get_count > 0) ? (1.0 * real_hit_cnt / _get_count) : 0.0;
+    double ghost_hit_rate = (_get_count > 0) ? (1.0 * ghost_hit_cnt / _get_count) : 0.0;
+
     std::stringstream s;
-    s << "trace:" << _file_name << " ISCORE_cache:"
-        << " cache_size:" << _c
-        << " request:" << _get_count
-        << " hit:" << _hit_count
-        << " hit_rate:" << 1.0 * _hit_count / _get_count << std::endl;
+    s << "trace:" << _file_name << " ARC:"
+      << " cache_size:" << _c
+      << " request:" << _get_count
+      << " real_hit:" << real_hit_cnt
+      << " real_hit_rate:" << real_hit_rate
+      << " final_p:" << _p
+      << "\n";
+
+    // 命中分布（明确区分 real hit 和 ghost hit）
+    s << "  real_hit (T1+T2): " << real_hit_cnt 
+      << " (T1:" << _t1_hit << " T2:" << _t2_hit << ")"
+      << "\n";
+    s << "  ghost_hit (B1+B2): " << ghost_hit_cnt
+      << " (B1:" << _b1_hit << " B2:" << _b2_hit << ")"
+      << " ghost_rate:" << ghost_hit_rate
+      << "\n";
+
+    // 淘汰来源
+    s << "  eviction: from_T1:" << _evict_from_t1
+      << " from_T2:" << _evict_from_t2
+      << "\n";
+
+    // 队列占用情况
+    s << "  queue_usage: T1:" << _t1.size()
+      << " T2:" << _t2.size()
+      << " B1:" << _b1.size()
+      << " B2:" << _b2.size()
+      << " total:" << (_t1.size() + _t2.size() + _b1.size() + _b2.size())
+      << "\n";
+
     return s.str();
 }
-
-uint64_t ISCORECache::regionId(int block_or_object_id) {
-    // 当前 trace 中，SCORE 的 target 即为 block_id（来自 trace_line.starting_block+i）
-    // 因此这里直接使用 block_id / REGION_SIZE_BLOCKS 把连续 block 划分为 region。
-    if (_region_size_blocks == 0) {
-        return 0;
-    }
-    return static_cast<uint64_t>(block_or_object_id) / _region_size_blocks;
-}
-
-void ISCORECache::updateRegionHot(uint64_t rid) {
-    // 逻辑时间 _access_seq 单调递增（由 request_number 提供）
-    uint64_t last_seq = 0;
-    auto it_last = _region_last_seq.find(rid);
-    if (it_last != _region_last_seq.end()) {
-        last_seq = it_last->second;
-    }
-
-    double H = 0.0;
-    auto it_hot = _region_hot.find(rid);
-    if (it_hot != _region_hot.end()) {
-        H = it_hot->second;
-    }
-
-    uint64_t dt = _access_seq - last_seq;
-    double dt_d = static_cast<double>(dt);
-
-    // H = H * exp(-LAMBDA * dt) + 1
-    H = H * std::exp(-_lambda * dt_d) + 1.0;
-
-    _region_hot[rid] = H;
-    _region_last_seq[rid] = _access_seq;
-}
-
-double ISCORECache::wInterval(uint64_t rid) {
-    double H = 0.0;
-    uint64_t last_seq = 0;
-
-    auto it_hot = _region_hot.find(rid);
-    if (it_hot != _region_hot.end()) {
-        H = it_hot->second;
-    }
-    auto it_last = _region_last_seq.find(rid);
-    if (it_last != _region_last_seq.end()) {
-        last_seq = it_last->second;
-    }
-
-    // 将 H 衰减到当前 _access_seq（这里不再 +1，因为这是 “观察” 而非 “访问更新”）
-    uint64_t dt = _access_seq - last_seq;
-    double dt_d = static_cast<double>(dt);
-    H = H * std::exp(-_lambda * dt_d);
-
-    double norm = 0.0;
-    if (H + _smooth_c > 0.0) {
-        norm = H / (H + _smooth_c);
-    }
-
-    return 1.0 + _alpha * norm;
-}
-
-

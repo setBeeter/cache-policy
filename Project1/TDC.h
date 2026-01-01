@@ -7,19 +7,19 @@
 #include <cstdint>
 #include <chrono>
 struct temp {
-    int n;  // Ψһʶ
-    double temperature; // ǰ¶
-    int size; // С
+    int n;  // 唯一标识
+    double temperature; // 温度
+    int size; // 大小
     std::chrono::system_clock::time_point last_access_time; // 最后访问时间
 };
-//TDCParams ṹ壺Ψһʶһӳ䣬ӳ佫ڱӳ䵽Ӧ temp ʵ
+//TDCParams 结构体：唯一标识一个映射，映射将在内部映射到相应的 temp 实例
 struct TDCParams {
-    int target;  // Ψһʶ
-    int n; // ǰ
+    int target;  // 唯一标识
+    int n; // 周期
     double size;
-    std::unordered_map<int, std::unordered_map<int, temp>> temperatureTable; //µ¶ȱ
+    std::unordered_map<int, std::unordered_map<int, temp>> temperatureTable; //温度表
 };
-//temp ṹ壺ڴ洢ڵ¶ȡСʱ䡣
+//temp 结构体用于存储温度、大小和时间。
 
 
 class TDCCache {
@@ -37,15 +37,15 @@ public:
     int get(const TDCParams& params);
     std::string statics();
     //double calculateTemperature(int target);
-    int currentCycleAccessCount;  //¼ǰڵķʴ
-   //ʹһϣ std::unordered_map<int, TDCParams>ڴ洢ÿ TDCParams ʵ
+    int currentCycleAccessCount;  //当前周期的访问
+   //使用一个哈希 std::unordered_map<int, TDCParams>来存储每个 TDCParams 实例
     std::unordered_map<int, std::unordered_map<int,temp>> temperatureTable;
-    // 洢¶ԼڵǶ׹ϣ
+    // 存储温度以及节点的缓存哈希
     //std::unordered_map<int, double> densityTable;
 private:
-    //һ洢ݵ _items
+    //一个存储数据的 _items
     std::list<std::pair<int, int>> _items; // (target, cache_addr)
-    std::unordered_map<int, std::list<std::pair<int, int>>::iterator> _table;//ϣ洢ÿλõĹϣ _table
+    std::unordered_map<int, std::list<std::pair<int, int>>::iterator> _table;//哈希存储每个位置的映射 _table
     int _capacity;
     unsigned int _hit_count;
     unsigned int _get_count;

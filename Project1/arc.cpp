@@ -1,110 +1,71 @@
 #include "arc.h"
 
-#define min(a,b) ((a < b)? a : b)
-#define max(a,b) ((a > b)? a : b)
-
-
 int ARCCache::get(int target) {
     if (_c <= 0) {
         return -1;
     }
 
     ++_get_count;
+
     auto it = _table.find(target);
     if (it != _table.end()) {
+        // hit
+        ++_hit_count;
 
-        // case1
-        if (it->second->lru_type == T1 || it->second->lru_type == T2) {
-            move_to_lru(it->second, T2);
-            assert_c();
-            ++_hit_count;
-            return it->second->addr;
-        }
-
-        // case2
-        if (it->second->lru_type == B1) {
-            auto t = _b1.size() >= _b2.size() ? 1 : _b2.size() / (double)_b1.size();
-            _p = min(_p + t, _c);
-            replace(false);
-            move_to_lru(it->second, T2);
-            it->second->addr = target;
-            assert_c();
-            return it->second->addr;
-        }
-
-        // case3
-        if (it->second->lru_type == B2) {
-            auto t = _b2.size() >= _b1.size() ? 1 : _b1.size() / (double)_b2.size();
-            _p = max(_p - t, 0);
-            replace(true);
-            move_to_lru(it->second, T2);
-            it->second->addr = target;
-            assert_c();
-            return it->second->addr;
-        }
-
-    }
-    else
-    {
-        // ���δ�ҵ�Ŀ�����ζ�Ż���δ����
-        _miss_count++;  // ����δ���м�����
-
-        // case4
-        assert(_t1.size() + _b1.size() <= _c);
-        if (_t1.size() + _b1.size() == _c) {
-            // case4.1
-            if (_t1.size() < _c) {
-                _table.erase(_b1.back()->target);
-                _b1.pop_back();
-                replace(false);
+        if (it->second.seg == Segment::T1) {
+            // 命中在 T1：从 T1 提升到 T2 头部
+            if (_t2_cap == 0) {
+                // 极端小 cache：退化为单段 LRU（都在 T1）
+                _t1.splice(_t1.begin(), _t1, it->second.it);
+                it->second.it = _t1.begin();
+                return target;
             }
-            else {
-                _table.erase(_t1.back()->target);
+
+            _t2.splice(_t2.begin(), _t1, it->second.it);
+            it->second.seg = Segment::T2;
+            it->second.it = _t2.begin();
+
+            // T2 超过容量：尾部降级到 T1 头部
+            while (_t2.size() > _t2_cap) {
+                int demote = _t2.back();
+                _t2.pop_back();
+                _t1.push_front(demote);
+                auto& info = _table[demote];
+                info.seg = Segment::T1;
+                info.it = _t1.begin();
+            }
+
+            // T1 超过容量：尾部淘汰
+            while (_t1.size() > _t1_cap) {
+                int evict = _t1.back();
                 _t1.pop_back();
+                _table.erase(evict);
             }
-        }
-        else {
-            // case 4.2
-            assert(_t1.size() + _b1.size() < _c);
-            auto size = _t1.size() + _t2.size() + _b1.size() + _b2.size();
-            if (size >= _c) {
-                if (size == _c * 2) {
-                    _table.erase(_b2.back()->target);
-                    _b2.pop_back();
-                }
-                replace(false);
-            }
-        }
-       
-    }
-    std::shared_ptr<ArcEntry> entry = std::make_shared<ArcEntry>();
-    entry->target = target;
-    entry->addr = target;
-    entry->lru_type = T1;
-        _t1.push_front(entry);
-        entry->iter = _t1.begin();
-    _table[target] = entry;
-    assert_c();
-    return _t1.front()->addr;
 
-}
+            return target;
+        }
 
-void ARCCache::replace(bool in_b2) {
-    if (_t1.size() != 0 &&
-        ((_t1.size() > _p) || (in_b2 && _t1.size() == _p))) {
-        assert(!_t1.empty());
-        auto entry = _t1.back();
-        entry->addr = -1;
-        assert(entry->lru_type == T1);
-        move_to_lru(entry, B1);
+        // 命中在 T2：移动到 T2 头部
+        _t2.splice(_t2.begin(), _t2, it->second.it);
+        it->second.it = _t2.begin();
+        return target;
     }
-    else {
-        assert(!_t2.empty());
-        auto entry = _t2.back();
-        entry->addr = -1;
-        assert(entry->lru_type == T2);
-        move_to_lru(entry, B2);
+
+    // miss
+    ++_miss_count;
+
+    // 插入到 T1 头部
+    _t1.push_front(target);
+    _table.emplace(target, NodeInfo{ Segment::T1, _t1.begin() });
+
+    // T1 超过容量：尾部淘汰
+    while (_t1.size() > _t1_cap) {
+        int evict = _t1.back();
+        _t1.pop_back();
+        _table.erase(evict);
     }
+
+    return target;
 }
 
 std::string ARCCache::statics() {
@@ -113,7 +74,7 @@ std::string ARCCache::statics() {
         << " cache_size:" << _c
         << " request:" << _get_count
         << " hit:" << _hit_count
-        << " miss:" << _miss_count  // ����δ���д���
+        << " miss:" << _miss_count  // miss count
         << " hit_rate:" << 1.0 * _hit_count / _get_count << std::endl;
     return s.str();
 }

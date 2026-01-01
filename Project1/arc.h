@@ -1,106 +1,80 @@
 #ifndef ARC_H
 #define ARC_H
 
-#include <cassert>
+#include <cstddef>
+#include <cstdint>
 #include <list>
-#include <unordered_map>
-#include <iostream>
-#include <memory>
 #include <sstream>
-//LruType ö�٣��о��˲�ͬ���͵� LRU���������ʹ�ã��б���T1��B1��T2��B2��None��
-enum LruType {
-    T1,
-    B1,
-    T2,
-    B2,
-    None,
-};
-//ArcEntry �ṹ�壺��ʾ�����е�һ����Ŀ������Ŀ�ꡢ��ַ��LRU ���ͺ��б��ĵ�����
-struct ArcEntry;
-/*ArcEntryPtr ���������� ArcEntry ���������ָ�롣��ͨ������ȷ���ڲ�����Ҫ�ö���ʱ��ȷ�ͷ��ڴ棬�������ֶ����� delete���� ArcEntryPtr ���󳬳���Χʱ�������Զ����������������ͷŹ������ڴ档*/
-using ArcEntryPtr = std::shared_ptr<ArcEntry>;
+#include <string>
+#include <unordered_map>
 
-struct ArcEntry {
-    int target;
-    int addr;
-    LruType lru_type;
-    std::list<ArcEntryPtr>::iterator iter;
-};
-//ARCCache �ࣺʵ���� ARC �����㷨
+/**
+ * @brief 高性能 SLRU（Segmented LRU）实现：作为原 ARC 的快速替代 baseline
+ *
+ * 目标：
+ * - cache_size >= 1e6、百万级 trace 下极致性能
+ * - 所有操作 O(1)：list splice + unordered_map 句柄
+ * - 不使用 shared_ptr / new / make_shared
+ *
+ * 策略（工程近似，命中率允许明显下降）：
+ * - 两段 LRU：T1（cold/probation，约 20%）+ T2（hot/protected，约 80%）
+ * - miss：插入 T1 头
+ * - hit in T1：提升到 T2 头
+ * - hit in T2：移动到 T2 头
+ * - T2 超过容量：T2 尾部降级到 T1 头
+ * - T1 超过容量：T1 尾部淘汰
+ */
 class ARCCache {
-
 public:
-    //// ���캯������ʼ��������������ݽṹ
-    explicit ARCCache(int c, std::string file_name) : _c(c), _p(0),
-        _file_name(file_name), _hit_count(0), _get_count(0),_miss_count(0) {
+    explicit ARCCache(int c, std::string file_name)
+        : _c(c),
+          _file_name(std::move(file_name)),
+          _hit_count(0),
+          _get_count(0),
+          _miss_count(0) {
+        if (_c > 0) {
+            // 固定分段比例：T1=20%，T2=80%
+            _t1_cap = static_cast<std::size_t>(_c) * 2 / 10;
+            if (_t1_cap == 0) _t1_cap = 1;
+            _t2_cap = static_cast<std::size_t>(_c) - _t1_cap;
 
-        _list_table[T1] = &_t1;
-        _list_table[T2] = &_t2;
-        _list_table[B1] = &_b1;
-        _list_table[B2] = &_b2;
+            _table.reserve(static_cast<std::size_t>(_c) * 2 + 1);
+            _table.max_load_factor(0.7f);
     }
-    //// ���ÿ������캯���͸�ֵ�������ȷ����һʵ��
+    }
+
     ARCCache(const ARCCache&) = delete;
     ARCCache& operator=(const ARCCache&) = delete;
-    // ��������
-    ~ARCCache() {}
+    ~ARCCache() = default;
 
 public:
-    // ��ȡ������ָ��Ŀ�������
     int get(int target);
-    // ���ػ����ͳ����Ϣ
     std::string statics();
 
 private:
-    // ����Ŀ�ƶ���ָ���� LRU �б�
-    inline void move_to_lru(const ArcEntryPtr& entry, const LruType& new_type) {
-        auto src_list = _list_table[entry->lru_type];
-        auto dst_list = _list_table[new_type];
-        assert(src_list != nullptr && dst_list != nullptr);
-
-        auto it = src_list->begin();
-        for (; it != src_list->end(); ++it) {
-            if (it->get() == entry.get()) {
-                break;
-            }
-        }
-        assert(it != src_list->end());
-
-        dst_list->splice(dst_list->begin(), *src_list, it);
-        entry->lru_type = new_type;
-        entry->iter = dst_list->begin();
-    }
-    // ִ���滻����
-    void replace(bool in_b2);
-    // ������������黺���С�Ƿ�����涨
-    inline void assert_c() {
-        assert(_t1.size() + _t2.size() <= _c);
-        assert(_t1.size() + _b1.size() <= _c);
-        assert(_t2.size() + _b2.size() <= _c * 2);
-        assert(_t1.size() + _b1.size() + _t2.size() + _b2.size() <= _c * 2);
-    }
+    enum class Segment : uint8_t { T1, T2 };
+    struct NodeInfo {
+        Segment seg;
+        std::list<int>::iterator it;
+    };
 
 private:
-    // ��ͬ LRU �б�
-    std::list<ArcEntryPtr> _t1;
-    std::list<ArcEntryPtr> _b1;
-    std::list<ArcEntryPtr> _t2;
-    std::list<ArcEntryPtr> _b2;
-    // ӳ�䲻ͬ LRU �б�������
-    std::unordered_map<LruType, std::list<ArcEntryPtr>*> _list_table;
-    std::unordered_map<int, ArcEntryPtr> _table;
-    // ��������
+    // 两段 LRU
+    std::list<int> _t1;  // cold/probation
+    std::list<int> _t2;  // hot/protected
+
+    // key -> (segment, iterator)
+    std::unordered_map<int, NodeInfo> _table;
+
     int _c;
-    // P ����
-    double _p;
-    // ���д����ͷ��ʴ���
+    std::size_t _t1_cap{0};
+    std::size_t _t2_cap{0};
+
     unsigned int _hit_count;
     unsigned int _get_count;
-    int _miss_count;  // �����ӵ�δ���м�����
+    unsigned int _miss_count;
 
-    // 文件名
     std::string _file_name;
-
 };
 
 #endif  // ARC_H

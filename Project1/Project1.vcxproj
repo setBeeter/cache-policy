@@ -134,6 +134,7 @@
     <ClInclude Include="arc.h" />
     <ClInclude Include="bloomfilter.h" />
     <ClInclude Include="histogram.h" />
+    <ClInclude Include="ihc.h" />
     <ClInclude Include="lru.h" />
     <ClInclude Include="score.h" />
     <ClInclude Include="iscore.h" />
@@ -143,14 +144,16 @@
     <ClInclude Include="TraceLine.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="arc.cpp" />
-    <ClCompile Include="lru.cpp" />
+    <ClCompile Include="ihc.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="score.cpp" />
-    <ClCompile Include="iscore.cpp" />
-    <ClCompile Include="TDC.cpp" />
-    <ClCompile Include="tdc2.cpp" />
-    <ClCompile Include="tiercache.cpp" />
+    <!-- 以下文件暂不编译（仅使用 IHC 算法） -->
+    <!-- <ClCompile Include="arc.cpp" /> -->
+    <!-- <ClCompile Include="lru.cpp" /> -->
+    <!-- <ClCompile Include="score.cpp" /> -->
+    <!-- <ClCompile Include="iscore.cpp" /> -->
+    <!-- <ClCompile Include="TDC.cpp" /> -->
+    <!-- <ClCompile Include="tdc2.cpp" /> -->
+    <!-- <ClCompile Include="tiercache.cpp" /> -->
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

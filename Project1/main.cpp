@@ -3,10 +3,11 @@
 #include <string>
 #include <ctime>      // 用于 time() 函数
 #include <cassert>   // 用于 assert() 宏
-#include "arc.h"
-#include "lru.h"
+// #include "arc.h"
+// #include "lru.h"
 // #include"score.h"
-#include"iscore.h"
+// #include"iscore.h"
+#include "ihc.h"
 #include "TraceLine.h"
 #include <vector>
 #include <chrono>
@@ -55,13 +56,26 @@ int main(int argc, char** argv) {
     }
 
     // ========== 缓存算法初始化 ==========
-    LRUCache lru_cache(c, argv[2]);
-    ARCCache arc_cache(c, argv[2]);
+    // LRUCache lru_cache(c, argv[2]);
+    // ARCCache arc_cache(c, argv[2]);
     // ========== ISCORE 参数说明 ==========
     // lambda = 0.001    温度衰减系数（越大衰减越快）
     // c_smooth = 1.0    age 平滑常数（避免除零，>0 即可）
     // evict_k = 1       每次淘汰数量（k=1 最精准，k 越大速度越快但命中率可能下降）
-    ISCORECache iscore_cache(c, argv[2], /*lambda=*/0.001, /*c_smooth=*/1.0, /*evict_k=*/1);
+    // ISCORECache iscore_cache(c, argv[2], /*lambda=*/0.001, /*c_smooth=*/1.0, /*evict_k=*/1);
+    
+    // ========== IHC 参数说明 ==========
+    // interval_len = 10000  每个 interval 的请求数
+    // alpha = 0.9           EMA 衰减系数（越大衰减越慢）
+    // th_up = 0.5           WARM -> HOT 晋升阈值
+    // th_down = 0.3         HOT -> WARM 降级阈值（必须 < Th_up）
+    // step_rule = 1         自适应步长规则：0=固定1, 1=动态比例
+    IHCCache ihc_cache(c, argv[2],
+                      /*interval_len=*/IHCConfig::DEFAULT_INTERVAL_LEN,
+                      /*alpha=*/IHCConfig::DEFAULT_ALPHA,
+                      /*th_up=*/IHCConfig::DEFAULT_TH_UP,
+                      /*th_down=*/IHCConfig::DEFAULT_TH_DOWN,
+                      /*step_rule=*/IHCConfig::DEFAULT_STEP_RULE);
 
     trace_line l;
     int line_count = 0;
@@ -86,18 +100,23 @@ int main(int argc, char** argv) {
             // ========== t_get 计时开始 ==========
             auto t0_get = std::chrono::steady_clock::now();
 
-            // LRU 算法
-            auto res1 = lru_cache.get(i);
-            assert(res1 != -1);
+            // LRU 算法（已注释）
+            // auto res1 = lru_cache.get(i);
+            // assert(res1 != -1);
 
-            // ARC 算法
-            auto res2 = arc_cache.get(i);
-            assert(res2 != -1);
+            // ARC 算法（已注释）
+            // auto res2 = arc_cache.get(i);
+            // assert(res2 != -1);
 
-            // 新版 ISCORE：只需要 block_id 和 size，不再需要 trace_records
-            ISCOREParams iscore_param{ i, 4096 };  // block size = 4096 bytes
-            auto res_is = iscore_cache.get(iscore_param);
-            assert(res_is != -1);
+            // ISCORE 算法（已注释）
+            // ISCOREParams iscore_param{ i, 4096 };  // block size = 4096 bytes
+            // auto res_is = iscore_cache.get(iscore_param);
+            // assert(res_is != -1);
+
+            // IHC 算法
+            IHCParams ihc_param{ i, 4096 };  // block size = 4096 bytes
+            auto res_ihc = ihc_cache.get(ihc_param);
+            assert(res_ihc != -1);
 
             auto t1_get = std::chrono::steady_clock::now();
             g_t_get_ns += std::chrono::duration<double, std::nano>(t1_get - t0_get).count();
@@ -180,9 +199,10 @@ int main(int argc, char** argv) {
         }
     };
     
-    output_to_both(lru_cache.statics());
-    output_to_both(arc_cache.statics());
-    output_to_both(iscore_cache.statics());
+    // output_to_both(lru_cache.statics());
+    // output_to_both(arc_cache.statics());
+    // output_to_both(iscore_cache.statics());
+    output_to_both(ihc_cache.statics());
     
     if (output_file.is_open()) {
         output_file.close();
